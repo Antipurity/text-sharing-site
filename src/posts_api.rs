@@ -56,18 +56,18 @@ impl Post {
         }
     }
     /// Adds a new child-post to a parent-post.
-    /// Returns (user, parent, Option<child>).
-    pub fn new(mut parent: Post, mut user: Post, content: String, children_rights: Vec<String>) -> (Post, Post, Option<Post>) {
-        let hash = &user.access_hash;
+    /// Returns (user_first_post, parent, Option<child>).
+    pub fn new(mut parent: Post, mut user_first_post: Post, content: String, children_rights: Vec<String>) -> (Post, Post, Option<Post>) {
+        let hash = &user_first_post.access_hash;
         if parent.children_rights.iter().any(|s| s == "" || s == hash) {
             let id = new_uuid();
-            user.created_post_ids.push(id.clone());
+            user_first_post.created_post_ids.push(id.clone());
             parent.children_ids.push(id.clone());
             let parent_id = parent.id.clone();
             let access_hash = hash.to_string();
             std::mem::drop(hash);
             (
-                user,
+                user_first_post,
                 parent,
                 Some(Post {
                     id,
@@ -82,7 +82,7 @@ impl Post {
                 })
             )
         } else {
-            (user, parent, None)
+            (user_first_post, parent, None)
         }
     }
     /// Changes a post's content and its openness-to-comments status.
@@ -98,24 +98,23 @@ impl Post {
         }
     }
     /// Gives reward to a post, from a user: -100|-1|1.
-    pub fn reward(self: Post, user: String, amount: i8) -> Option<Post> {
-        let hash = access_token_hash(&user);
+    /// Returns (user_first_post, Option<rewarded_post>).
+    pub fn reward(self: Post, mut user_first_post: Post, amount: i8) -> (Post, Option<Post>) {
         if amount != -100 && amount != -1 && amount != 1 {
-            return None
+            return (user_first_post, None)
         };
-        if amount == -100 && self.access_hash != user {
-            return None
+        if amount == -100 && self.access_hash != user_first_post.access_hash {
+            return (user_first_post, None)
         };
-        // TODO: ???.rewarded_posts[&self.id] = amount
-        return Some(Post{
+        *user_first_post.rewarded_posts.entry(self.id.clone()).or_insert(0i8) = amount;
+        return (user_first_post, Some(Post{
             reward: self.reward + (amount as i64),
             ..self
-        })
+        }))
     }
     /// Returns `{ content, post_reward, user_reward, parent_id, children_rights }` as a JSON string.
     /// `content` and `parent_id` are strings,  rewards are integers, `children_rights` is an array of strings.
     pub fn to_json(self: &Post, user: &Post) -> String {
-        // TODO: Also, accept the user, and return how much said user has rewarded this post.
         json!({
             "content": self.content,
             "post_reward": self.reward,
@@ -126,13 +125,8 @@ impl Post {
     }
 
     // TODO: Start..end slices:
-    //   TODO: All children of a post.
-    //     TODO: Sorted by date.
-    //     TODO: Sorted by reward.
-    //   TODO: All rewarded-post-IDs of a user (access_token).
-    //   TODO: All created-post-IDs of a user (access_token).
-    //   …Doesn't this mean that children_ids and rewarded_posts should not be stored so directly on Post…
-
-    // TODO: ...Also, string->Post conversion, for easy DB look up...
-    //   Do we really want that, though... Not like it's very useful if DB lookup is async.
+    //   TODO: All children of a post: `pub fn get_children_newest_first(&self, start:u32, end:u32)->Vec<String>`.
+    //   TODO: All children of a post, most-rewarded first: `pub fn get_children_best_first(&self, start:u32, end:u32)->Vec<String>`.
+    //   TODO: All rewarded-post-IDs of a user (access_token): `pub fn get_rewarded_posts(&self, start:u32, end:u32)->Vec<String>`.
+    //   TODO: All created-post-IDs of a user (access_token): `pub fn get_created_posts(&self, start:u32, end:u32)->Vec<String>`.
 }
