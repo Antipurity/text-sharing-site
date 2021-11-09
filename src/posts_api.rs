@@ -124,9 +124,33 @@ impl Post {
         }).to_string()
     }
 
-    // TODO: Start..end slices:
-    //   TODO: All children of a post: `pub fn get_children_newest_first(&self, start:u32, end:u32)->Vec<String>`.
-    //   TODO: All children of a post, most-rewarded first: `pub fn get_children_best_first(&self, start:u32, end:u32)->Vec<String>`.
-    //   TODO: All rewarded-post-IDs of a user (access_token): `pub fn get_rewarded_posts(&self, start:u32, end:u32)->Vec<String>`.
-    //   TODO: All created-post-IDs of a user (access_token): `pub fn get_created_posts(&self, start:u32, end:u32)->Vec<String>`.
+    /// Gets the specified child-post IDs of a post, most-recent first.
+    /// (Currently not optimized, because there's no need.)
+    pub fn get_children_newest_first(&self, start:usize, end:usize) -> Result<Vec<String>, ()> {
+        if start >= end {
+            let iter = self.children_ids.iter().rev().skip(start).take(end-start);
+            Ok(iter.map(|s| s.clone()).collect())
+        } else {
+            Err(())
+        }
+    }
+
+    /// Gets the specified rewarded-post IDs of a user's first post, most-recent first.
+    /// (Currently not optimized, because there's no need.)
+    pub fn get_rewarded_posts(&self, start:usize, end:usize) -> HashMap<&String, &i8> {
+        let mut v: Vec<_> = self.rewarded_posts.iter().collect(); // Key-value pairs.
+        v.reverse();
+        v[start..end].iter().map(|p| *p).collect()
+    }
+
+    /// Gets the specified created-post IDs of a user's first post, most-recent first.
+    /// (Currently not optimized, because there's no need.)
+    pub fn get_created_posts(&self, start:usize, end:usize) -> Result<Vec<String>, ()> {
+        if start >= end {
+            let iter = self.created_post_ids.iter().rev().skip(start).take(end-start);
+            Ok(iter.map(|s| s.clone()).collect())
+        } else {
+            Err(())
+        }
+    }
 }
