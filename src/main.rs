@@ -12,8 +12,10 @@ use iron::mime::*;
 use iron::Handler;
 use staticfile::Static;
 use uuid::Uuid;
-use sha2::Digest;
 use serde_json::json;
+
+mod hashing;
+use hashing::access_token_hash;
 
 
 
@@ -22,30 +24,10 @@ fn new_uuid() -> String {
     Uuid::new_v4().to_string()
 }
 
-/// Computes an SHA256 hash of a concatenation of byte arrays, given in the iterator.
-/// Irreversible hash: given output, input is practically impossible to predict.
-/// Example:
-/// ```
-/// println!("SHA256: {}", hash(["hello".as_bytes()].iter()));
-/// // SHA256: 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
-/// ```
-fn hash<T>(of: T) -> String
-where T:Iterator, <T as Iterator>::Item: AsRef<[u8]> {
-    let mut hasher = sha2::Sha256::new();
-    for item in of {
-        hasher.update(item);
-    }
-    return hex::encode(hasher.finalize())
-}
-
-/// Hashes passwords (more like access tokens, here), so that we don't store them, and attackers can't really guess them.
-pub fn access_token_hash(access: &String) -> String {
-    hash(["saltghdcexg".as_bytes(), access.as_bytes(), "nhlfjeryhbbugvtj6vtt6i67vtiv998".as_bytes()].iter())
-}
 
 // TODO: Stores for sessions (temporary, sessionId→userId; session id is created on successful login, and stored as a cookie) and posts and access_hash→post_ids and URL name→id (name is like 2020/month/day/first_line if no overlaps).
 //   TODO: Delete posts with less than -10 reward.
-//   TODO: Use Firebase as the database. ...Or maybe Redis?
+//   TODO: Use Firebase as the database.
 //   TODO: In `store.rs`: `fn get(id)` and `fn set(id, post→post)`.
 
 
