@@ -13,6 +13,7 @@ use iron::Handler;
 use staticfile::Static;
 use uuid::Uuid;
 use sha2::Digest;
+use serde_json::json;
 
 
 
@@ -87,19 +88,28 @@ impl Post {
             rewarded_posts: HashMap::new(),
         }
     }
-    // TODO: Document all these funcs.
-    pub fn new(parent_id: String, content: String, access_hash: String, children_rights: Vec<String>) -> Post { // TODO: Pass in `parent:Post`.
-        // TODO: ...Shouldn't we also add this post to parent's children, and fail if permissions don't match...
-        //   TODO: Pass in the parent by mutable reference. ...Or should we modify it, and return a tuple of posts...
-        Post {
-            id: new_uuid(),
-            access_hash,
-            content,
-            reward: 0i64,
-            parent_id,
-            children_rights,
-            children_ids: Vec::new(),
-            rewarded_posts: HashMap::new(),
+    /// Adds a new child-post to a parent-post.
+    pub fn new(mut parent: Post, user: String, content: String, children_rights: Vec<String>) -> (Post, Option<Post>) {
+        let hash = access_token_hash(user);
+        if parent.children_rights.iter().any(|s| s == "" || s == &hash) {
+            let id = new_uuid();
+            parent.children_ids.push(id.clone());
+            let parent_id = parent.id.clone();
+            (
+                parent,
+                Some(Post {
+                    id,
+                    access_hash: hash,
+                    content,
+                    reward: 0i64,
+                    parent_id,
+                    children_rights,
+                    children_ids: Vec::new(),
+                    rewarded_posts: HashMap::new(),
+                })
+            )
+        } else {
+            (parent, None)
         }
     }
     /// Changes a post's content and its openness-to-comments status.
@@ -114,17 +124,35 @@ impl Post {
             None
         }
     }
-    // TODO: to_json(&Post) -> String
+    pub fn reward(self: Post, by: Post, amount: i8) -> Option<Post> { // TODO: Accept user, not Post.
+        // TODO: Fail if amount is not -100|-1|1.
+        // TODO: Fail if amount is -100 but self.access_hash != access_token_hash(user).
+        // TODO: self.reward += amount (by returning a Post).
+        // TODO: ???.rewarded_posts[self.id.clone()] = amount
+    }
     // TODO: Reward a post, from another post, by -100/-1/1 (i8).
+    /// Returns `{ content, reward, parent_id, children_rights }` as a JSON string.
+    /// `content` and `parent_id` are strings,  `reward` is an integer, `children_rights` is an array of strings.
+    pub fn to_json(self: &Post) -> String {
+        // TODO: Also, accept the user, and return how much said user has rewarded this post.
+        json!({
+            "content": self.content,
+            "reward": self.reward,
+            "parent_id": self.parent_id,
+            "children_rights": self.children_rights,
+        }).to_string()
+    }
 
-    // TODO: fn login(access_token): None if access_token_hash(access_token) is not in the database, Some(first_post_id) otherwise.
+    // TODO: fn login(user): None if access_token_hash(user) is not in the database, Some(first_post_id) otherwise.
+    //   Need a database for this, though.
 
     // TODO: Pagified:
     //   TODO: All children of a post.
     //     TODO: Sorted by date.
     //     TODO: Sorted by reward.
-    //   TODO: All rewarded-posts of a user (access_token).
-    //   TODO: All owned posts of a user (access_token).
+    //   TODO: All rewarded-post-IDs of a user (access_token).
+    //   TODO: All owned post IDs of a user (access_token).
+    //   …Doesn't this mean that children_ids and rewarded_posts should not be stored so directly on Post…
 
     // TODO: ...Also, string->Post conversion, for easy DB look up...
 }
