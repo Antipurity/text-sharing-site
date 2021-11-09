@@ -39,7 +39,7 @@ where T:Iterator, <T as Iterator>::Item: AsRef<[u8]> {
 }
 
 /// Hashes passwords (more like access tokens, here), so that we don't store them, and attackers can't really guess them.
-pub fn access_token_hash(access: String) -> String {
+pub fn access_token_hash(access: &String) -> String {
     hash(["saltghdcexg".as_bytes(), access.as_bytes(), "nhlfjeryhbbugvtj6vtt6i67vtiv998".as_bytes()].iter())
 }
 
@@ -90,7 +90,7 @@ impl Post {
     }
     /// Adds a new child-post to a parent-post.
     pub fn new(mut parent: Post, user: String, content: String, children_rights: Vec<String>) -> (Post, Option<Post>) {
-        let hash = access_token_hash(user);
+        let hash = access_token_hash(&user);
         if parent.children_rights.iter().any(|s| s == "" || s == &hash) {
             let id = new_uuid();
             parent.children_ids.push(id.clone());
@@ -114,7 +114,7 @@ impl Post {
     }
     /// Changes a post's content and its openness-to-comments status.
     pub fn edit(self: Post, user: String, content: String, children_rights: Vec<String>) -> Option<Post> {
-        if access_token_hash(user) == self.access_hash {
+        if access_token_hash(&user) == self.access_hash {
             Some(Post {
                 content,
                 children_rights,
@@ -124,13 +124,21 @@ impl Post {
             None
         }
     }
-    pub fn reward(self: Post, by: Post, amount: i8) -> Option<Post> { // TODO: Accept user, not Post.
-        // TODO: Fail if amount is not -100|-1|1.
-        // TODO: Fail if amount is -100 but self.access_hash != access_token_hash(user).
-        // TODO: self.reward += amount (by returning a Post).
+    /// Gives reward to a post, from a user: -100|-1|1.
+    pub fn reward(self: Post, user: String, amount: i8) -> Option<Post> {
+        let hash = access_token_hash(&user);
+        if amount != -100 && amount != -1 && amount != 1 {
+            return None
+        };
+        if amount == -100 && self.access_hash != user {
+            return None
+        };
         // TODO: ???.rewarded_posts[self.id.clone()] = amount
+        return Some(Post{
+            reward: self.reward + (amount as i64),
+            ..self
+        })
     }
-    // TODO: Reward a post, from another post, by -100/-1/1 (i8).
     /// Returns `{ content, reward, parent_id, children_rights }` as a JSON string.
     /// `content` and `parent_id` are strings,  `reward` is an integer, `children_rights` is an array of strings.
     pub fn to_json(self: &Post) -> String {
@@ -144,7 +152,7 @@ impl Post {
     }
 
     // TODO: fn login(user): None if access_token_hash(user) is not in the database, Some(first_post_id) otherwise.
-    //   Need a database for this, though.
+    //   Need a database for this, though. And be in another file.
 
     // TODO: Pagified:
     //   TODO: All children of a post.
