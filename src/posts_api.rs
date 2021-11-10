@@ -112,13 +112,17 @@ impl Post {
             ..self
         }))
     }
+
     /// Returns `{ content, post_reward, user_reward, parent_id, children_rights }` as a JSON string.
     /// `content` and `parent_id` are strings,  rewards are integers, `children_rights` is an array of strings.
-    pub fn to_json(self: &Post, user: &Post) -> String {
+    pub fn full_json(self: &Post, user: Option<&Post>) -> String {
         json!({
             "content": self.content,
             "post_reward": self.reward,
-            "user_reward": user.rewarded_posts[&self.id],
+            "user_reward": match user {
+                Some(u) => u.rewarded_posts.get(&self.id).map_or(0i8, |r| *r),
+                None => 0i8,
+             },
             "parent_id": self.parent_id,
             "children_rights": self.children_rights,
         }).to_string()
