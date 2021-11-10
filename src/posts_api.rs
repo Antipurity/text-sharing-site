@@ -24,7 +24,7 @@ fn new_uuid() -> String {
 /// ```
 #[derive(Clone)]
 pub struct Post {
-    id: String,
+    pub id: String,
     access_hash: String, // Username&password are concatenated & hashed to produce this.
     //   (No collisions this way. Especially if an access-file is used instead.)
     //   (Gates write access: creating posts, editing and 'deleting' them, and rewarding any posts.)

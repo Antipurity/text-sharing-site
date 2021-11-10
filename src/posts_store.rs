@@ -1,28 +1,56 @@
 //! Stores posts.
 //! This is a database-less thunk that simply stores posts in memory.
+//!   TODO: Use Firebase, not this thunk.
 
 
 
 use crate::posts_api::Post;
 
-use std::sync::Once;
 use std::sync::RwLock;
 use std::collections::HashMap;
-static data: Once = Once::new(); // TODO: ...No, I don't think this is any good...
-// TODO: What's the correct solution to create a singleton?
-//   Typed RwLock<HashMap<String, Post>>…
 
-fn get_data() -> &HashMap<String, Post> {
-    data.call_once() // TODO: Wait, no, why doesn't this return any results? HOW DO WE STORE THE CREATED HASH MAP
+
+
+struct Database {
+    posts: RwLock<HashMap<String, RwLock<Post>>>,
 }
 
 
 
-/// Reads one post from the database.
-pub fn read(id: &String) -> Option<Post> {
-    data.get(id).map(|x| (*x).clone())
+impl Database {
+    /// Initializes the database connection.
+    pub fn init() -> Database {
+        Database{ posts: RwLock::new(HashMap::new()) }
+    }
+    /// Reads many posts from the database at once.
+    pub fn read(&self, ids: Vec<&String>) -> Vec<Option<Post>> {
+        let map = self.posts.read().unwrap();
+        ids.iter().map(|id| {
+            let maybe_post = (*map).get(id.clone()).map(|x| x.read().unwrap());
+            maybe_post.map(|post| (*post).clone())
+        }).collect()
+    }
+    /// Updates many posts in the database at once: read, process, write, as one atomic operation.
+    pub fn update<F, N>(&self, ids: Vec<&String>, action: F)
+    where F: FnOnce(Vec<Option<Post>>) -> Vec<Option<Post>> {
+        let posts = self.read(ids);
+        let posts = action(posts);
+        let mut map_lock = self.posts.write().unwrap();
+        let map = &mut *map_lock;
+        for maybe_post in posts {
+            match maybe_post {
+                Some(post) => {
+                    match map.get(&post.id) {
+                        Some(post_locker) => {
+                            // Actually, these per-post locks are kinda useless, since we're locking the whole map to read/write it anyway.
+                            let mut lock = post_locker.write().unwrap();
+                            (*lock).clone_from(&post);
+                        },
+                        None => { map.insert(post.id.clone(), RwLock::new(post)); },
+                    }
+                },
+                None => (),
+            }
+        }
+    }
 }
-
-// TODO: Set: `pub fn update([…ids], |[…posts]| updated_posts)`.
-
-// TODO: A thunk, using global maps instead of a database.
