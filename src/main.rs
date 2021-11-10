@@ -12,12 +12,12 @@ use iron::Handler;
 use staticfile::Static;
 
 mod posts_api;
+// mod posts_store; // TODO
 
 
 // TODO: Stores for sessions (temporary, sessionId→userId; session id is created on successful login, and stored as a cookie) and posts and access_hash→post_id and URL name→id (name is like 2020/month/day/first_line if no overlaps).
 //   TODO: Delete posts with less than -10 reward.
 //   TODO: Use Firebase as the database.
-//   TODO: In `store.rs`: `fn get(id)` and `fn set(id, post→post)`.
 // TODO: fn login(user): None if access_token_hash(user) is not in the database, Some(first_post_id) otherwise.
 //   Need a database for this, though. And be in another file.
 

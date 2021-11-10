@@ -22,7 +22,8 @@ fn new_uuid() -> String {
 /// ```
 /// assert_eq!(5*5, 25)
 /// ```
-struct Post {
+#[derive(Clone)]
+pub struct Post {
     id: String,
     access_hash: String, // Username&password are concatenated & hashed to produce this.
     //   (No collisions this way. Especially if an access-file is used instead.)
@@ -33,6 +34,7 @@ struct Post {
     parent_id: String,
     children_rights: Vec<String>, // An empty string, usually (must be empty to disallow comments).
     children_ids: Vec<String>,
+    rewarded_sum: i8,
     rewarded_posts: HashMap<String, i8>, // -100 (only own posts), -1, 1.
     //   (Only non-empty for initial access_hash posts, meaning, user accounts.)
     //   (Sum of non -100 rewards should be -10..=10, for balance.)
@@ -51,6 +53,7 @@ impl Post {
             parent_id: "".to_string(), // No parent.
             children_rights: vec!["".to_string()], // Open to all comments.
             children_ids: Vec::new(),
+            rewarded_sum: 0i8,
             rewarded_posts: HashMap::new(),
             created_post_ids: Vec::new(),
         }
@@ -77,6 +80,7 @@ impl Post {
                     parent_id,
                     children_rights,
                     children_ids: Vec::new(),
+                    rewarded_sum: 0i8,
                     rewarded_posts: HashMap::new(),
                     created_post_ids: Vec::new(),
                 })
@@ -98,13 +102,23 @@ impl Post {
         }
     }
     /// Gives reward to a post, from a user: -100|-1|1.
+    /// Only succeeds if the user has given up to ±10 of ±1 rewards, to force normalization.
     /// Returns (user_first_post, Option<rewarded_post>).
     pub fn reward(self: Post, mut user_first_post: Post, amount: i8) -> (Post, Option<Post>) {
+        if &self.access_hash == &user_first_post.access_hash {
+            return (user_first_post, None)
+        }
         if amount != -100 && amount != -1 && amount != 1 {
             return (user_first_post, None)
         };
         if amount == -100 && self.access_hash != user_first_post.access_hash {
             return (user_first_post, None)
+        };
+        if amount != -100 {
+            if user_first_post.rewarded_sum < -10 || user_first_post.rewarded_sum > 10 {
+                return (user_first_post, None)
+            }
+            user_first_post.rewarded_sum += amount;
         };
         *user_first_post.rewarded_posts.entry(self.id.clone()).or_insert(0i8) = amount;
         return (user_first_post, Some(Post{
