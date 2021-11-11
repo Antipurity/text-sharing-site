@@ -31,7 +31,7 @@ use serde_json::json;
 // TODO: Templating with Handlebars. (Because all-JS sites are getting boring.)
 //   TODO: Allow viewing (and editing if allowed) (and rewarding if logged in) a post & its children (with reward shown, along with the first line of Markdown contents, and first-lines of author contents), and a textfield & preview of a new post if you're allowed.
 //     (And a way to expand-all.)
-//     (And the post's username/password, switched by a checkbox to a file input (innovative), if anyone can post in the post, or if the checkbox "Create account" is checked. On submit, hash it client-side.)
+//     (And the post's username/password, switched by a checkbox to a file input (innovative), if anyone can post and not logged in (else it would be too irksome to see it everywhere). On submit, hash it client-side.)
 
 
 
