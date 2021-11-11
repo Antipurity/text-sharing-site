@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 
 
-struct Database {
+pub struct Database {
     posts: RwLock<HashMap<String, RwLock<Post>>>,
 }
 
@@ -19,7 +19,7 @@ struct Database {
 
 impl Database {
     /// Initializes the database connection.
-    pub fn init() -> Database {
+    pub fn new() -> Database {
         Database{ posts: RwLock::new(HashMap::new()) }
     }
     /// Reads many posts from the database at once.

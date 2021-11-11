@@ -23,8 +23,9 @@ use cookie::Cookie;
 //   TODO: Use Firebase as the database.
 // TODO: fn login(user): None if access_token_hash(user) is not in the database, Some(first_post_id) otherwise.
 //   Need a database for this, though. And be in another file.
-//     ...Should we maybe use the same object as in `posts_store`, but store strings and reconstruct posts from that JSON, and use other keys to access other data...
+//     ...Should we maybe use the same object as in `posts_store`, but store JSON strings and reconstruct posts from that JSON, and use other keys to access other data...
 //       (Would allow us to re-use the functions, except for parse-post. …Or maybe we should extract those, and have Post-processing be separate…)
+//     ...Also, `posts_store`'s `update` isn't actually atomic; the whole function should be protected by one write-lock to make that true (otherwise updates can get swallowed).
 
 
 
@@ -36,6 +37,7 @@ use cookie::Cookie;
 //     (And a way to expand-all.)
 //     (And the post's username/password, switched by a checkbox to a file input (innovative), if anyone can post and not logged in (else it would be too irksome to see it everywhere). On submit, hash it client-side.)
 //       (The login page should transmit the header `Set-Cookie: user=…`.)
+//     (And if the "" post does not exist, allow creating it.)
 
 
 
@@ -56,7 +58,22 @@ fn main() {
     //   `handlebars_helper!(hex: |v: i64| format!("0x{:x}", v))`
     //   `templates.register_helper("hex", Box::new(hex))`
     //   `{{hex 16}}`
-    //   ...Should we specify the API here, not in its own file?
+    //   TODO: Helpers:
+    //     TODO: Get post by ID.
+    //       TODO: Get post's reward.
+    //       TODO: Get user's reward to post, if logged in.
+    //       TODO: Get whether we can edit the post (logged in, and owning it).
+    //       TODO: Get post's parent ID.
+    //       TODO: Get Markdown post content's first line, as a 'safe' string (put as-is, as HTML).
+    //       TODO: Get Markdown post content, as a 'safe' string (put as-is, as HTML).
+    //     TODO: Get post's children, pagified to 50 posts per page.
+    //     TODO: Get user's rewarded posts, pagified to 50 posts per page.
+    //     TODO: Get user's created posts, pagified to 50 posts per page.
+    //   TODO: Helpers that edit posts, and report whether editing was successful:
+    //     TODO: New post, by user, in post, with content, with sub-posting by none/self/all.
+    //       (Probably need to handle POST requests and parse form data to get the content.)
+    //     TODO: Edit post, by user, with content, with sub-posting by none/self/all.
+    //     TODO: Reward post, by user, by amount (-100|-1|1).
     let templates = templates;
     let render = |templates: &Handlebars, name: &str, user: &str, post: &str| {
         let body = templates.render(name, &json!({
@@ -65,6 +82,7 @@ fn main() {
         })).unwrap();
         Ok(Response::with((iron::mime::mime!(Text/Html), iron::status::Ok, body)))
     };
+    let data = posts_store::Database::new();
     let chain = Chain::new(move |req: &mut Request| -> IronResult<Response> {
         // Get the `user=…` cookie. (It's a whole big process. The `cookie` library is questionably designed.)
         let cookie = req.headers.get::<iron::headers::Cookie>();
@@ -85,7 +103,7 @@ fn main() {
             _ => match files.handle(req) {
                 Ok(x) => Ok(x),
                 Err(_) => {
-                    // TODO: Try serving post ID, else human-readable URL, else 404.
+                    // TODO: Try serving post ID, else human-readable URL (that maps to post's ID), else 404.
                     render(&templates, "404", &user, "")
                 }
             },
