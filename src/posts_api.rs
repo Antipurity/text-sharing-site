@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 mod hashing;
-use hashing::access_token_hash;
+pub use hashing::access_token_hash;
 
 use uuid::Uuid;
 use serde_json::json;
@@ -140,6 +140,7 @@ impl Post {
              },
             "parent_id": self.parent_id,
             "children_rights": self.children_rights,
+            "access_hash": self.access_hash,
         })
     }
 

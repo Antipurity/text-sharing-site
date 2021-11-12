@@ -5,6 +5,7 @@
 use std::sync::Arc;
 
 use crate::posts_store::Database;
+use crate::posts_api::access_token_hash;
 
 use handlebars::{HelperDef, Helper, Handlebars, Context, RenderContext, ScopedJson, RenderError};
 use serde_json::json;
@@ -15,9 +16,9 @@ pub enum Which {
     // Viewing.
     GetPostById, // post_id, user → post
     GetPostReward, // post → num
-    GetUserReward, // user, post → num
-    IsEditable, // user, post → bool
-    GetParent, // post → num
+    GetUserReward, // post → num
+    GetEditable, // post, user → bool
+    GetParentId, // post → post_id
     GetSummary, // post → string (the first line of content, parsed into HTML)
     GetContent, // post → string (the whole Markdown content, parsed into HTML)
     GetPostChildren, // post, page_index → array<post>
@@ -49,14 +50,28 @@ impl HelperDef for PostHelper {
         let str_arg = |i| arg(i).as_str().unwrap();
         let f = |x| Ok(Some(ScopedJson::from(x)));
         f(match &self.which {
-            Which::GetPostById => match self.data.read(vec![str_arg(0)])[0] {
-                Some(ref p) => p.to_json(None), // TODO: Needs the user: Some(&Post). Read from the database.
+            Which::GetPostById => json!({"post": match self.data.read(vec![str_arg(0)])[0] {
+                Some(ref p) => p.to_json(None), // TODO: Needs the user: Some(&Post). Read from the database. ...Or accept as a JSON value, and have `GetUserFirstPost(access_token)`?
                 None => json!(null),
-            },
+            }}),
             Which::GetPostReward => match arg(0).get("post_reward") {
                 Some(v) => json!(v.as_i64().unwrap()),
                 None => json!(0i64),
             },
+            Which::GetUserReward => match arg(0).get("user_reward") {
+                Some(v) => json!(v.as_i64().unwrap()),
+                None => json!(0i64),
+            },
+            Which::GetEditable => match arg(0).get("access_hash").map(|v| v.as_str()) {
+                Some(Some(v)) => json!(v == access_token_hash(str_arg(1))),
+                _ => json!(false),
+            },
+            Which::GetParentId => match arg(0).get("parent_id") {
+                Some(v) => json!(v.as_str().unwrap()),
+                None => json!(""),
+            },
+            // TODO: Which::GetSummary
+            // TODO: Which::GetContent
             _ => json!("what are you tellin me to do??"),
             // TODO: Do all the ops.
         })
@@ -68,10 +83,17 @@ impl PostHelper {
         let mut f = |s, t| templates.register_helper(s, Box::new(PostHelper{ which:t, data:d.clone() }));
         f("GetPostById", Which::GetPostById);
         f("GetPostReward", Which::GetPostReward);
+        f("GetUserReward", Which::GetUserReward);
+        f("GetEditable", Which::GetEditable);
+        f("GetParentId", Which::GetParentId);
+        f("GetSummary", Which::GetSummary);
         f("GetContent", Which::GetContent);
-        // templates.register_helper("GetPostById", Box::new(PostHelper{ which:Which::GetPostById, d: data.clone() }));
-        // templates.register_helper("GetPostReward", Box::new(PostHelper{ which:Which::GetPostReward, d: data.clone() }));
-        // templates.register_helper("GetContent", Box::new(PostHelper{ which:Which::GetContent, d: data.clone() }));
+        f("GetPostChildren", Which::GetPostChildren);
+        f("GetPostChildrenLength", Which::GetPostChildrenLength);
+        f("GetUserRewards", Which::GetUserRewards);
+        f("GetUserRewardsLength", Which::GetUserRewardsLength);
+        f("GetUserPosts", Which::GetUserPosts);
+        f("GetUserPostsLength", Which::GetUserPostsLength);
     }
 }
 

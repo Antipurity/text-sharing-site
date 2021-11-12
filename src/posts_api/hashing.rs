@@ -19,6 +19,6 @@ where T:Iterator, <T as Iterator>::Item: AsRef<[u8]> {
 }
 
 /// Hashes username+password info (an access token), so that we don't store them, and attackers can't realistically guess them.
-pub fn access_token_hash(access: &String) -> String {
+pub fn access_token_hash(access: &str) -> String {
     hash(["saltghdcexg".as_bytes(), access.as_bytes(), "nhlfjeryhbbugvtj6vtt6i67vtiv998".as_bytes()].iter())
 }

@@ -7,7 +7,15 @@
   <body>
     <h1>Hello!</h1>
     <p>Hi from Rust</p>
-    <p>{{GetContent "" user post}}</p>
-    <p>Reward: {{GetPostReward (GetPostById post user)}}</p>
+    <p>User: {{user}}</p>
+    {{#with (GetPostById post user)}}
+      <p>Reward: {{GetPostReward post}}</p>
+      {{#if (GetEditable post ../user)}}
+        <p>Editable</p>
+      {{else}}
+        <p>Not editable</p>
+      {{/if}}
+      <p>Parent ID: {{GetParentId post}}</p>
+    {{/with}}
   </body>
 </html>
