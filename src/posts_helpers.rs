@@ -29,8 +29,6 @@ pub enum Which {
     GetUserRewardsLength, // user → length
     GetUserPosts, // user, page_index → array<post>
     GetUserPostsLength, // user → length
-    // TODO: Editing.
-    // TODO: Login & logout.
 }
 
 
@@ -54,6 +52,7 @@ impl HelperDef for PostHelper {
         f(match &self.which {
             Which::GetPostById => json!({"post": match self.data.read(vec![str_arg(0)])[0] {
                 Some(ref p) => p.to_json(None), // TODO: Needs the user: Some(&Post). Read from the database. ...Or accept as a JSON value, and have `GetUserFirstPost(access_token)`?
+                // TODO: `posts_store` should have support for getting and setting a user's first post! (Maybe even automatic, by `read` and `update`.)
                 None => json!(null),
             }}),
             Which::GetPostReward => match arg(0).get("post_reward") {
@@ -89,7 +88,15 @@ impl HelperDef for PostHelper {
                 },
                 _ => json!(""),
             },
-            // TODO: Which::GetContent
+            Which::GetContent => match arg(0).get("content").map(|v| v.as_str()) {
+                Some(Some(v)) => {
+                    let parser = Parser::new(v);
+                    let mut html_output = String::new();
+                    html::push_html(&mut html_output, parser);
+                    json!(ammonia::clean(&*html_output))
+                },
+                _ => json!(""),
+            },
             // TODO: Which::GetPostChildren
             // TODO: Which::GetPostChildrenLength
             // TODO: Which::GetUserRewards
@@ -97,7 +104,6 @@ impl HelperDef for PostHelper {
             // TODO: Which::GetUserPosts
             // TODO: Which::GetUserPostsLength
             _ => json!("what are you tellin me to do??"),
-            // TODO: Do all the ops.
         })
     }
 }
@@ -121,7 +127,3 @@ impl PostHelper {
         f("GetUserPostsLength", Which::GetUserPostsLength);
     }
 }
-
-
-
-// TODO: A function to register all helpers on a `handlebars::Handlebars` instance.

@@ -60,25 +60,17 @@ fn main() {
     //   TODO: Helpers:
     //     TODO: Login: from user's access-token (`user` here), get its first post ID or nothing.
     //       ...How would we set the SetCookie header correctly, though... That would need to be some advanced state magic...
-    //     TODO: Get post by ID.
-    //       TODO: Get post's reward.
-    //       TODO: Get user's reward to post, if logged in.
-    //       TODO: Get whether we can edit the post (logged in, and owning it).
-    //       TODO: Get post's parent ID.
-    //       TODO: Get Markdown post content's first line, as a 'safe' string (put as-is, as HTML).
-    //       TODO: Get Markdown post content, as a 'safe' string (put as-is, as HTML).
-    //     TODO: Get post's children, pagified to 50 posts per page.
-    //     TODO: Get user's rewarded posts, pagified to 50 posts per page.
-    //     TODO: Get user's created posts, pagified to 50 posts per page.
     //   TODO: Helpers that edit posts, and report whether editing was successful:
     //     TODO: New post, by user, in post, with content, with sub-posting by none/self/all. (Also creates an entry in URL name→id. …And if a new user, creates an entry in access_hash→first_post_id. These should be funcs in `Database`, shouldn't they?)
     //       (Probably need to handle POST requests and parse form data to get the content.)
     //     TODO: Edit post, by user, with content, with sub-posting by none/self/all.
     //     TODO: Reward post, by user, by amount (-100|-1|1).
+    //     ...Or should all of these be not helpers, but actual POST-request handlers, parsing form data...
+    //       Login/logout should be like this too, right? Cookie-setting is contagious enough for this, right?
     let data = Arc::new(posts_store::Database::new());
     data.update(vec![""], |_: Vec<Option<posts_api::Post>>| {
         println!("Creating the initial post..."); // TODO
-        vec![Some(posts_api::Post::new_public(Some("".to_string()), "# The initial post\n\nWhy hello there. This is the public post.".to_string()))]
+        vec![Some(posts_api::Post::new_public(Some("".to_string()), "# The initial post\n\nWhy hello there. This is the public post.\n\n<script>console.log('JS injection')</script>".to_string()))]
     });
     posts_helpers::PostHelper::register(&mut templates, &data);
 
