@@ -58,7 +58,7 @@ impl HelperDef for PostHelper {
                 None => json!(0i64),
             },
             _ => json!("what are you tellin me to do??"),
-            // TODO: Do all the ops. Get the args with h.param(0/1/2)?.value(), which returns https://docs.rs/serde_json/1.0.68/serde_json/value/enum.Value.html
+            // TODO: Do all the ops.
         })
         // Ok(Some(ScopedJson::from(json!("hello there")))) // TODO
     }

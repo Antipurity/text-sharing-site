@@ -57,10 +57,6 @@ fn main() {
         }
     }
 
-    // TODO: Expose the whole string-based API as helpers.
-    //   `handlebars_helper!(hex: |v: i64| format!("0x{:x}", v))`
-    //   `templates.register_helper("hex", Box::new(hex))`
-    //   `{{hex 16}}`
     //   TODO: Helpers:
     //     TODO: Login: from user's access-token (`user` here), get its first post ID or nothing.
     //       ...How would we set the SetCookie header correctly, though... That would need to be some advanced state magic...
@@ -81,9 +77,10 @@ fn main() {
     //     TODO: Reward post, by user, by amount (-100|-1|1).
     let data = Arc::new(posts_store::Database::new());
     data.update(vec![""], |_: Vec<Option<posts_api::Post>>| {
-        vec![Some(posts_api::Post::new_public("Why hello there. This is the public post.".to_string()))]
+        println!("Creating the initial post..."); // TODO
+        vec![Some(posts_api::Post::new_public(Some("".to_string()), "Why hello there. This is the public post.".to_string()))]
     });
-    posts_helpers::PostHelper::register(&mut templates, &data); // TODO: Why does neither arg live long enough? Why are we trying to borrow as static?
+    posts_helpers::PostHelper::register(&mut templates, &data);
 
 
 

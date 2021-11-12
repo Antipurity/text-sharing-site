@@ -45,9 +45,9 @@ pub struct Post {
 impl Post {
     /// Creates a new, top-level, open-to-comments, post.
     /// Exists because we have to root the post tree in *something*.
-    pub fn new_public(content: String) -> Post {
+    pub fn new_public(id: Option<String>, content: String) -> Post {
         Post {
-            id: new_uuid(),
+            id: id.unwrap_or_else(|| new_uuid()),
             access_hash: "".to_string(), // No user can edit it (except for our own functions).
             content,
             reward: 0i64,

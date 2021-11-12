@@ -46,7 +46,9 @@ impl Database {
                             let mut lock = post_locker.write().unwrap();
                             (*lock).clone_from(&post);
                         },
-                        None => { map.insert(post.id.clone(), RwLock::new(post)); },
+                        None => {
+                            map.insert(post.id.clone(), RwLock::new(post));
+                        },
                     }
                 },
                 None => (),
