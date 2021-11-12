@@ -9,6 +9,7 @@
     <p>Hi from Rust</p>
     <p>User: {{user}}</p>
     {{#with (GetPostById post user)}}
+      <p>This: {{this}}</p>
       <p>Reward: {{GetPostReward post}}</p>
       {{#if (GetEditable post ../user)}}
         <p>Editable</p>
@@ -16,6 +17,7 @@
         <p>Not editable</p>
       {{/if}}
       <p>Parent ID: {{GetParentId post}}</p>
+      <p>Summary: {{GetSummary post}}</p>
     {{/with}}
   </body>
 </html>

@@ -78,7 +78,7 @@ fn main() {
     let data = Arc::new(posts_store::Database::new());
     data.update(vec![""], |_: Vec<Option<posts_api::Post>>| {
         println!("Creating the initial post..."); // TODO
-        vec![Some(posts_api::Post::new_public(Some("".to_string()), "Why hello there. This is the public post.".to_string()))]
+        vec![Some(posts_api::Post::new_public(Some("".to_string()), "# The initial post\n\nWhy hello there. This is the public post.".to_string()))]
     });
     posts_helpers::PostHelper::register(&mut templates, &data);
 

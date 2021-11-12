@@ -9,6 +9,7 @@ use crate::posts_api::access_token_hash;
 
 use handlebars::{HelperDef, Helper, Handlebars, Context, RenderContext, ScopedJson, RenderError};
 use serde_json::json;
+use pulldown_cmark::{Parser, Options, html};
 
 
 
@@ -66,12 +67,27 @@ impl HelperDef for PostHelper {
                 Some(Some(v)) => json!(v == access_token_hash(str_arg(1))),
                 _ => json!(false),
             },
-            Which::GetParentId => match arg(0).get("parent_id") {
-                Some(v) => json!(v.as_str().unwrap()),
-                None => json!(""),
+            // TODO: ...Also something for checking whether we can post, right? What, exactly?
+            Which::GetParentId => match arg(0).get("parent_id").map(|v| v.as_str()) {
+                Some(Some(v)) => json!(v),
+                _ => json!(""),
             },
-            // TODO: Which::GetSummary
+            Which::GetSummary => match arg(0).get("content").map(|v| v.as_str()) {
+                Some(Some(v)) => {
+                    match v.split_once('\n') {
+                        Some((line, rest)) => json!(line.trim_start_matches('#').trim()),
+                        None => json!(v),
+                    }
+                },
+                _ => json!(""),
+            },
             // TODO: Which::GetContent
+            // TODO: Which::GetPostChildren
+            // TODO: Which::GetPostChildrenLength
+            // TODO: Which::GetUserRewards
+            // TODO: Which::GetUserRewardsLength
+            // TODO: Which::GetUserPosts
+            // TODO: Which::GetUserPostsLength
             _ => json!("what are you tellin me to do??"),
             // TODO: Do all the ops.
         })
