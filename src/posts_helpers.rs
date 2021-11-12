@@ -19,8 +19,9 @@ pub enum Which {
     GetPostReward, // post → num
     GetUserReward, // post → num
     GetEditable, // post, user → bool
+    GetPostable, // post, user → bool
     GetParentId, // post → post_id
-    GetSummary, // post → string (the first line of content, parsed into HTML)
+    GetSummary, // post → string (the first line of content)
     GetContent, // post → string (the whole Markdown content, parsed into HTML)
     GetPostChildren, // post, page_index → array<post>
     GetPostChildrenLength, // post → length
@@ -67,7 +68,14 @@ impl HelperDef for PostHelper {
                 Some(Some(v)) => json!(v == access_token_hash(str_arg(1))),
                 _ => json!(false),
             },
-            // TODO: ...Also something for checking whether we can post, right? What, exactly?
+            Which::GetPostable => {
+                let user = access_token_hash(str_arg(1));
+                let children_rights = arg(0).get("children_rights").unwrap().as_array().unwrap();
+                json!(children_rights.iter().any(|v| {
+                    let s = v.as_str().unwrap();
+                    s == "" || s == user
+                }))
+            },
             Which::GetParentId => match arg(0).get("parent_id").map(|v| v.as_str()) {
                 Some(Some(v)) => json!(v),
                 _ => json!(""),
@@ -101,6 +109,7 @@ impl PostHelper {
         f("GetPostReward", Which::GetPostReward);
         f("GetUserReward", Which::GetUserReward);
         f("GetEditable", Which::GetEditable);
+        f("GetPostable", Which::GetPostable);
         f("GetParentId", Which::GetParentId);
         f("GetSummary", Which::GetSummary);
         f("GetContent", Which::GetContent);

@@ -12,9 +12,14 @@
       <p>This: {{this}}</p>
       <p>Reward: {{GetPostReward post}}</p>
       {{#if (GetEditable post ../user)}}
-        <p>Editable</p>
+        <p>Can edit</p>
       {{else}}
-        <p>Not editable</p>
+        <p>Cannot edit</p>
+      {{/if}}
+      {{#if (GetPostable post ../user)}}
+        <p>Can post here</p>
+      {{else}}
+        <p>Cannot post here</p>
       {{/if}}
       <p>Parent ID: {{GetParentId post}}</p>
       <p>Summary: {{GetSummary post}}</p>
