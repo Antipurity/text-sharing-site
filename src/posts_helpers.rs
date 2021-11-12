@@ -51,16 +51,15 @@ impl HelperDef for PostHelper {
         f(match &self.which {
             Which::GetPostById => match self.data.read(vec![str_arg(0)])[0] {
                 Some(ref p) => p.to_json(None), // TODO: Needs the user: Some(&Post). Read from the database.
-                None => json!("NOT FOUND"), // TODO: ...Why not found?
+                None => json!(null),
             },
-            Which::GetPostReward => match arg(0).get("reward") {
+            Which::GetPostReward => match arg(0).get("post_reward") {
                 Some(v) => json!(v.as_i64().unwrap()),
                 None => json!(0i64),
             },
             _ => json!("what are you tellin me to do??"),
             // TODO: Do all the ops.
         })
-        // Ok(Some(ScopedJson::from(json!("hello there")))) // TODO
     }
 }
 

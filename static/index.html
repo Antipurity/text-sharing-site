@@ -8,6 +8,6 @@
     <h1>Hello!</h1>
     <p>Hi from Rust</p>
     <p>{{GetContent "" user post}}</p>
-    <p>{{GetPostById "" user}}</p>
+    <p>Reward: {{GetPostReward (GetPostById post user)}}</p>
   </body>
 </html>
