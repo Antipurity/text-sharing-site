@@ -140,6 +140,7 @@ impl Post {
              },
             "parent_id": self.parent_id,
             "children_rights": self.children_rights,
+            "children": self.children_ids.len(),
             "access_hash": self.access_hash,
         })
     }

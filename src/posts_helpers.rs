@@ -9,7 +9,11 @@ use crate::posts_api::access_token_hash;
 
 use handlebars::{HelperDef, Helper, Handlebars, Context, RenderContext, ScopedJson, RenderError};
 use serde_json::json;
-use pulldown_cmark::{Parser, Options, html};
+use pulldown_cmark::{Parser, html};
+
+
+
+const PAGE_LEN: i64 = 50;
 
 
 
@@ -82,7 +86,7 @@ impl HelperDef for PostHelper {
             Which::GetSummary => match arg(0).get("content").map(|v| v.as_str()) {
                 Some(Some(v)) => {
                     match v.split_once('\n') {
-                        Some((line, rest)) => json!(line.trim_start_matches('#').trim()),
+                        Some((line, _rest)) => json!(line.trim_start_matches('#').trim()),
                         None => json!(v),
                     }
                 },
@@ -98,11 +102,15 @@ impl HelperDef for PostHelper {
                 _ => json!(""),
             },
             // TODO: Which::GetPostChildren
-            // TODO: Which::GetPostChildrenLength
+            Which::GetPostChildrenLength => match arg(0).get("children").map(|v| v.as_i64()) {
+                Some(Some(v)) => json!(1 + (v-1) / PAGE_LEN), // Always at least 1.
+                _ => json!(0i64),
+            }
             // TODO: Which::GetUserRewards
             // TODO: Which::GetUserRewardsLength
             // TODO: Which::GetUserPosts
             // TODO: Which::GetUserPostsLength
+            //   All these user things need access to the user's first post, right?
             _ => json!("what are you tellin me to do??"),
         })
     }
