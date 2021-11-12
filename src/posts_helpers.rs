@@ -52,13 +52,14 @@ impl HelperDef for PostHelper {
     ) -> Result<Option<ScopedJson<'reg, 'rc>>, RenderError> {
         let arg = |i| h.param(i).unwrap().value();
         let str_arg = |i| arg(i).as_str().unwrap();
+        let i64_arg = |i| arg(i).as_i64().unwrap();
         let f = |x| Ok(Some(ScopedJson::from(x)));
         f(match &self.which {
-            Which::GetPostById => json!({"post": match self.data.read(vec![str_arg(0)])[0] {
-                Some(ref p) => p.to_json(None), // TODO: Needs the user: Some(&Post). Read from the database. ...Or accept as a JSON value, and have `GetUserFirstPost(access_token)`?
+            Which::GetPostById => match self.data.read(vec![str_arg(0)])[0] {
+                Some(ref post) => post.to_json(None), // TODO: Needs the user: Some(&Post). Read from the database. ...Or accept as a JSON value, and have `GetUserFirstPost(access_token)`?
                 // TODO: `posts_store` should have support for getting and setting a user's first post! (Maybe even automatic, by `read` and `update`.)
                 None => json!(null),
-            }}),
+            },
             Which::GetPostReward => match arg(0).get("post_reward") {
                 Some(v) => json!(v.as_i64().unwrap()),
                 None => json!(0i64),
@@ -101,7 +102,22 @@ impl HelperDef for PostHelper {
                 },
                 _ => json!(""),
             },
-            // TODO: Which::GetPostChildren
+            Which::GetPostChildren => match arg(0).get("id").map(|v| v.as_str()) {
+                Some(Some(v)) => match self.data.read(vec![v])[0] {
+                    Some(ref post) => {
+                        let start:usize = (i64_arg(1) * PAGE_LEN) as usize;
+                        let end:usize = start + PAGE_LEN as usize;
+                        let ch = post.get_children_newest_first(start, end).unwrap();
+                        let ch = self.data.read(ch.iter().map(|s| &s[..]).collect());
+                        json!(ch.iter().map(|maybe_post| match maybe_post {
+                            Some(post) => post.to_json(None), // TODO: We also need the user if we're gonna be converting stuff to JSON.
+                            None => json!(null),
+                        }).collect::<handlebars::JsonValue>())
+                    },
+                    None => json!(null),
+                },
+                _ => json!(null),
+            },
             Which::GetPostChildrenLength => match arg(0).get("children").map(|v| v.as_i64()) {
                 Some(Some(v)) => json!(1 + (v-1) / PAGE_LEN), // Always at least 1.
                 _ => json!(0i64),
@@ -111,7 +127,7 @@ impl HelperDef for PostHelper {
             // TODO: Which::GetUserPosts
             // TODO: Which::GetUserPostsLength
             //   All these user things need access to the user's first post, right?
-            _ => json!("what are you tellin me to do??"),
+            _ => json!("what are you tellin me to do??"), // TODO: Remove this, once we handle all.
         })
     }
 }

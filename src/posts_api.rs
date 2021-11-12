@@ -132,6 +132,7 @@ impl Post {
     /// `content` and `parent_id` are strings,  rewards are integers, `children_rights` is an array of strings.
     pub fn to_json(self: &Post, user: Option<&Post>) -> JsonValue {
         json!({
+            "id": self.id,
             "content": self.content,
             "post_reward": self.reward,
             "user_reward": match user {
@@ -148,6 +149,8 @@ impl Post {
     /// Gets the specified child-post IDs of a post, most-recent first.
     /// (Currently not optimized, because there's no need.)
     pub fn get_children_newest_first(&self, start:usize, end:usize) -> Result<Vec<String>, ()> {
+        let start = std::cmp::min(start, self.children_ids.len());
+        let end = std::cmp::min(end, self.children_ids.len());
         if start >= end {
             let iter = self.children_ids.iter().rev().skip(start).take(end-start);
             Ok(iter.map(|s| s.clone()).collect())
@@ -159,6 +162,8 @@ impl Post {
     /// Gets the specified rewarded-post IDs of a user's first post, most-recent first.
     /// (Currently not optimized, because there's no need.)
     pub fn get_rewarded_posts(&self, start:usize, end:usize) -> HashMap<&String, &i8> {
+        let start = std::cmp::min(start, self.rewarded_posts.len());
+        let end = std::cmp::min(end, self.rewarded_posts.len());
         let mut v: Vec<_> = self.rewarded_posts.iter().collect(); // Key-value pairs.
         v.reverse();
         v[start..end].iter().map(|p| *p).collect()
@@ -167,6 +172,8 @@ impl Post {
     /// Gets the specified created-post IDs of a user's first post, most-recent first.
     /// (Currently not optimized, because there's no need.)
     pub fn get_created_posts(&self, start:usize, end:usize) -> Result<Vec<String>, ()> {
+        let start = std::cmp::min(start, self.created_post_ids.len());
+        let end = std::cmp::min(end, self.created_post_ids.len());
         if start >= end {
             let iter = self.created_post_ids.iter().rev().skip(start).take(end-start);
             Ok(iter.map(|s| s.clone()).collect())

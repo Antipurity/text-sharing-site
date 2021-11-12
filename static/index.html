@@ -11,20 +11,21 @@
     {{#with (GetPostById post user)}}
       <p>This: {{this}}</p>
       <p>Reward: {{GetPostReward post}}</p>
-      {{#if (GetEditable post ../user)}}
+      {{#if (GetEditable this ../user)}}
         <p>Can edit</p>
       {{else}}
         <p>Cannot edit</p>
       {{/if}}
-      {{#if (GetPostable post ../user)}}
+      {{#if (GetPostable this ../user)}}
         <p>Can post here</p>
       {{else}}
         <p>Cannot post here</p>
       {{/if}}
-      <p>Parent ID: {{GetParentId post}}</p>
-      <p>Summary: {{GetSummary post}}</p>
-      <p>{{{(GetContent post)}}}</p>
-      <p>Children, pages: {{GetPostChildrenLength post}}</p>
+      <p>Parent ID: {{GetParentId this}}</p>
+      <p>Summary: {{GetSummary this}}</p>
+      <p>{{{(GetContent this)}}}</p>
+      <p>Children, pages: {{GetPostChildrenLength this}}</p>
+      <p>Children, page 0: {{GetPostChildren this 0}}</p>
     {{/with}}
   </body>
 </html>
