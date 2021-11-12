@@ -1,9 +1,11 @@
 //! This code implements a web site for publicly sharing text.
 
 use std::path::Path;
+use std::sync::Arc;
 
 mod posts_api;
 mod posts_store;
+mod posts_helpers;
 
 extern crate iron;
 extern crate staticfile;
@@ -19,7 +21,7 @@ use serde_json::json;
 use cookie::Cookie;
 
 
-// TODO: Stores for sessions (temporary, sessionId→userId; session id is created on successful login, and stored as a cookie) and posts and access_hash→post_id and URL name→id (name is like 2020/month/day/first_line if no overlaps).
+// TODO: Stores for posts and access_hash→first_post_id and URL name→id (name is like 2020/first_line if no overlaps).
 //   TODO: Use Firebase as the database.
 // TODO: fn login(user): None if access_token_hash(user) is not in the database, Some(first_post_id) otherwise.
 //   Need a database for this, though. And be in another file.
@@ -54,11 +56,14 @@ fn main() {
             templates.register_template_file(name, full_path).unwrap();
         }
     }
+
     // TODO: Expose the whole string-based API as helpers.
     //   `handlebars_helper!(hex: |v: i64| format!("0x{:x}", v))`
     //   `templates.register_helper("hex", Box::new(hex))`
     //   `{{hex 16}}`
     //   TODO: Helpers:
+    //     TODO: Login: from user's access-token (`user` here), get its first post ID or nothing.
+    //       ...How would we set the SetCookie header correctly, though... That would need to be some advanced state magic...
     //     TODO: Get post by ID.
     //       TODO: Get post's reward.
     //       TODO: Get user's reward to post, if logged in.
@@ -70,10 +75,18 @@ fn main() {
     //     TODO: Get user's rewarded posts, pagified to 50 posts per page.
     //     TODO: Get user's created posts, pagified to 50 posts per page.
     //   TODO: Helpers that edit posts, and report whether editing was successful:
-    //     TODO: New post, by user, in post, with content, with sub-posting by none/self/all.
+    //     TODO: New post, by user, in post, with content, with sub-posting by none/self/all. (Also creates an entry in URL name→id. …And if a new user, creates an entry in access_hash→first_post_id. These should be funcs in `Database`, shouldn't they?)
     //       (Probably need to handle POST requests and parse form data to get the content.)
     //     TODO: Edit post, by user, with content, with sub-posting by none/self/all.
     //     TODO: Reward post, by user, by amount (-100|-1|1).
+    let data = Arc::new(posts_store::Database::new());
+    data.update(vec![""], |_: Vec<Option<posts_api::Post>>| {
+        vec![Some(posts_api::Post::new_public("Why hello there. This is the public post.".to_string()))]
+    });
+    posts_helpers::PostHelper::register(&mut templates, &data); // TODO: Why does neither arg live long enough? Why are we trying to borrow as static?
+
+
+
     let templates = templates;
     let render = |templates: &Handlebars, name: &str, user: &str, post: &str| {
         let body = templates.render(name, &json!({
@@ -82,7 +95,6 @@ fn main() {
         })).unwrap();
         Ok(Response::with((iron::mime::mime!(Text/Html), iron::status::Ok, body)))
     };
-    let data = posts_store::Database::new();
     let chain = Chain::new(move |req: &mut Request| -> IronResult<Response> {
         // Get the `user=…` cookie. (It's a whole big process. The `cookie` library is questionably designed.)
         let cookie = req.headers.get::<iron::headers::Cookie>();

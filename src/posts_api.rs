@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
-use uuid::Uuid;
-use serde_json::json;
-
 mod hashing;
 use hashing::access_token_hash;
+
+use uuid::Uuid;
+use serde_json::json;
+use handlebars::JsonValue;
 
 
 
@@ -127,9 +128,9 @@ impl Post {
         }))
     }
 
-    /// Returns `{ content, post_reward, user_reward, parent_id, children_rights }` as a JSON string.
+    /// Returns `{ content, post_reward, user_reward, parent_id, children_rights }` as a JSON object. (`.to_string()` will convert it to a JSON string.)
     /// `content` and `parent_id` are strings,  rewards are integers, `children_rights` is an array of strings.
-    pub fn full_json(self: &Post, user: Option<&Post>) -> String {
+    pub fn to_json(self: &Post, user: Option<&Post>) -> JsonValue {
         json!({
             "content": self.content,
             "post_reward": self.reward,
@@ -139,7 +140,7 @@ impl Post {
              },
             "parent_id": self.parent_id,
             "children_rights": self.children_rights,
-        }).to_string()
+        })
     }
 
     /// Gets the specified child-post IDs of a post, most-recent first.

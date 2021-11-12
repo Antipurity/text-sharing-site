@@ -23,7 +23,7 @@ impl Database {
         Database{ posts: RwLock::new(HashMap::new()) }
     }
     /// Reads many posts from the database at once.
-    pub fn read(&self, ids: Vec<&String>) -> Vec<Option<Post>> {
+    pub fn read(&self, ids: Vec<&str>) -> Vec<Option<Post>> {
         let map = self.posts.read().unwrap();
         ids.iter().map(|id| {
             let maybe_post = (*map).get(id.clone()).map(|x| x.read().unwrap());
@@ -31,7 +31,7 @@ impl Database {
         }).collect()
     }
     /// Updates many posts in the database at once: read, process, write, as one atomic operation.
-    pub fn update<F, N>(&self, ids: Vec<&String>, action: F)
+    pub fn update<F>(&self, ids: Vec<&str>, action: F)
     where F: FnOnce(Vec<Option<Post>>) -> Vec<Option<Post>> {
         let posts = self.read(ids);
         let posts = action(posts);
