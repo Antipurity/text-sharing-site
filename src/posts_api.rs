@@ -162,14 +162,20 @@ impl Post {
         }
     }
 
-    /// Gets the specified rewarded-post IDs of a user's first post, most-recent first.
+    /// Gets the specified rewarded-post IDs of a user's first post, in an arbitrary order.
     /// (Currently not optimized, because there's no need.)
-    pub fn get_rewarded_posts(&self, start:usize, end:usize) -> HashMap<&String, &i8> {
+    pub fn get_rewarded_posts(&self, start:usize, end:usize) -> Result<Vec<String>, ()> {
         let start = std::cmp::min(start, self.rewarded_posts.len());
         let end = std::cmp::min(end, self.rewarded_posts.len());
-        let mut v: Vec<_> = self.rewarded_posts.iter().collect(); // Key-value pairs.
-        v.reverse();
-        v[start..end].iter().map(|p| *p).collect()
+        if start >= end {
+            let iter = self.rewarded_posts.keys().skip(start).take(end-start);
+            Ok(iter.map(|s| s.clone()).collect())
+        } else {
+            Err(())
+        }
+    }
+    pub fn get_rewarded_posts_length(&self) -> usize {
+        self.rewarded_posts.len()
     }
 
     /// Gets the specified created-post IDs of a user's first post, most-recent first.
@@ -183,5 +189,8 @@ impl Post {
         } else {
             Err(())
         }
+    }
+    pub fn get_created_posts_length(&self) -> usize {
+        self.created_post_ids.len()
     }
 }

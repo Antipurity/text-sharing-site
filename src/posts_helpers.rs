@@ -29,8 +29,8 @@ pub enum Which {
     GetContent, // post → string (the whole Markdown content, parsed into HTML)
     GetPostChildren, // post, user, page_index → array<post>
     GetPostChildrenLength, // post → length
-    GetUserRewards, // user, page_index → array<post>
-    GetUserRewardsLength, // user → length
+    GetUserRewarded, // user, page_index → array<post>
+    GetUserRewardedLength, // user → length
     GetUserPosts, // user, page_index → array<post>
     GetUserPostsLength, // user → length
     // (All this authentication is a LOT of hashing and DB lookups per page-view. So uncivilized.)
@@ -54,16 +54,28 @@ impl HelperDef for PostHelper {
         let arg = |i| h.param(i).unwrap().value();
         let str_arg = |i| arg(i).as_str().unwrap();
         let i64_arg = |i| arg(i).as_i64().unwrap();
-        let auth = |user| match self.data.login(user).map(|fpi| self.data.read(vec![&fpi]).pop().unwrap()) {
+        let post = |id: String| self.data.read(vec!(&id)).pop().unwrap();
+        let auth = |user| match self.data.login(user).map(post) {
             Some(Some(first_post)) => Some(first_post),
             _ => None,
+        };
+        let page = |i| {
+            let start = (i * PAGE_LEN) as usize;
+            (start, start + PAGE_LEN as usize)
+        };
+        let post_ids_to_post_json = |ids: Vec<String>, first_post: Option<crate::posts_api::Post>| {
+            let posts = self.data.read(ids.iter().map(|s| &s[..]).collect());
+            json!(posts.iter().map(|maybe_post| match maybe_post {
+                Some(post) => post.to_json(first_post.as_ref()),
+                None => json!(null),
+            }).collect::<handlebars::JsonValue>())
         };
         let f = |x| Ok(Some(ScopedJson::from(x)));
         f(match &self.which {
             Which::GetPostById => {
                 let first_post = auth(str_arg(1));
                 let first_post_ref = first_post.as_ref();
-                match self.data.read(vec![str_arg(0)])[0] {
+                match post(str_arg(0).to_string()) {
                     Some(ref post) => post.to_json(first_post_ref),
                     None => json!(null),
                 }
@@ -111,18 +123,12 @@ impl HelperDef for PostHelper {
                 _ => json!(""),
             },
             Which::GetPostChildren => match arg(0).get("id").map(|v| v.as_str()) {
-                Some(Some(v)) => match self.data.read(vec![v])[0] {
+                Some(Some(v)) => match post(v.to_string()) {
                     Some(ref post) => {
                         let first_post = auth(str_arg(1));
-                        let first_post_ref = first_post.as_ref();
-                        let start:usize = (i64_arg(2) * PAGE_LEN) as usize;
-                        let end:usize = start + PAGE_LEN as usize;
+                        let (start, end) = page(i64_arg(2));
                         let ch = post.get_children_newest_first(start, end).unwrap();
-                        let ch = self.data.read(ch.iter().map(|s| &s[..]).collect());
-                        json!(ch.iter().map(|maybe_post| match maybe_post {
-                            Some(post) => post.to_json(first_post_ref),
-                            None => json!(null),
-                        }).collect::<handlebars::JsonValue>())
+                        post_ids_to_post_json(ch, first_post)
                     },
                     None => json!(null),
                 },
@@ -131,13 +137,39 @@ impl HelperDef for PostHelper {
             Which::GetPostChildrenLength => match arg(0).get("children").map(|v| v.as_i64()) {
                 Some(Some(v)) => json!(1 + (v-1) / PAGE_LEN), // Always at least 1.
                 _ => json!(0i64),
-            }
-            // TODO: Which::GetUserRewards
-            // TODO: Which::GetUserRewardsLength
-            // TODO: Which::GetUserPosts
-            // TODO: Which::GetUserPostsLength
-            //   All these user things need access to the user's first post, right?
-            _ => json!("what are you tellin me to do??"), // TODO: Remove this, once we handle all.
+            },
+            Which::GetUserRewarded => {
+                match auth(str_arg(0)) {
+                    Some(first_post) => {
+                        let (start, end) = page(i64_arg(1));
+                        let ch = first_post.get_rewarded_posts(start, end).unwrap();
+                        post_ids_to_post_json(ch, Some(first_post))
+                    },
+                    None => json!(null),
+                }
+            },
+            Which::GetUserRewardedLength => {
+                match auth(str_arg(0)) {
+                    Some(first_post) => json!(1 + (first_post.get_rewarded_posts_length() as i64 - 1)/PAGE_LEN),
+                    None => json!(0),
+                }
+            },
+            Which::GetUserPosts => {
+                match auth(str_arg(0)) {
+                    Some(first_post) => {
+                        let (start, end) = page(i64_arg(1));
+                        let ch = first_post.get_created_posts(start, end).unwrap();
+                        post_ids_to_post_json(ch, Some(first_post))
+                    },
+                    None => json!(null),
+                }
+            },
+            Which::GetUserPostsLength => {
+                match auth(str_arg(0)) {
+                    Some(first_post) => json!(1 + (first_post.get_created_posts_length() as i64 - 1)/PAGE_LEN),
+                    None => json!(0),
+                }
+            },
         })
     }
 }
@@ -155,8 +187,8 @@ impl PostHelper {
         f("GetContent", Which::GetContent);
         f("GetPostChildren", Which::GetPostChildren);
         f("GetPostChildrenLength", Which::GetPostChildrenLength);
-        f("GetUserRewards", Which::GetUserRewards);
-        f("GetUserRewardsLength", Which::GetUserRewardsLength);
+        f("GetUserRewarded", Which::GetUserRewarded);
+        f("GetUserRewardedLength", Which::GetUserRewardedLength);
         f("GetUserPosts", Which::GetUserPosts);
         f("GetUserPostsLength", Which::GetUserPostsLength);
     }
