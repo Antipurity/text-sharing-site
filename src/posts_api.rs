@@ -26,11 +26,12 @@ fn new_uuid() -> String {
 #[derive(Clone)]
 pub struct Post {
     pub id: String,
-    access_hash: String, // Username&password are concatenated & hashed to produce this.
+    pub access_hash: String, // Username&password are concatenated & hashed to produce this.
     //   (No collisions this way. Especially if an access-file is used instead.)
     //   (Gates write access: creating posts, editing and 'deleting' them, and rewarding any posts.)
     //     (Password is copied into posts, so can't change it.)
-    content: String, // Intended to be Markdown, with the first line displayed as the title.
+    pub human_readable_url: String, // A human-readable name, such as "2020_first_line".
+    pub content: String, // Intended to be Markdown, with the first line displayed as the title.
     reward: i64, // Less than -10 should get deleted.
     parent_id: String,
     children_rights: Vec<String>, // An empty string, usually (must be empty to disallow comments).
@@ -49,6 +50,7 @@ impl Post {
         Post {
             id: id.unwrap_or_else(|| new_uuid()),
             access_hash: "".to_string(), // No user can edit it (except for our own functions).
+            human_readable_url: "".to_string(),
             content,
             reward: 0i64,
             parent_id: "".to_string(), // No parent.
@@ -76,6 +78,7 @@ impl Post {
                 Some(Post {
                     id,
                     access_hash,
+                    human_readable_url: "".to_string(),
                     content,
                     reward: 0i64,
                     parent_id,
