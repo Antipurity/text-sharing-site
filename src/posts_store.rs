@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 
 pub struct Database {
-    posts: RwLock<HashMap<String, RwLock<Post>>>,
+    posts: RwLock<HashMap<String, Post>>,
 }
 
 
@@ -26,7 +26,7 @@ impl Database {
     pub fn read(&self, ids: Vec<&str>) -> Vec<Option<Post>> {
         let map = self.posts.read().unwrap();
         ids.iter().map(|id| {
-            let maybe_post = (*map).get(id.clone()).map(|x| x.read().unwrap());
+            let maybe_post = (*map).get(id.clone());
             maybe_post.map(|post| (*post).clone())
         }).collect()
     }
@@ -40,19 +40,15 @@ impl Database {
         for maybe_post in posts {
             match maybe_post {
                 Some(post) => {
-                    match map.get(&post.id) {
-                        Some(post_locker) => {
-                            // Actually, these per-post locks are kinda useless, since we're locking the whole map to read/write it anyway.
-                            let mut lock = post_locker.write().unwrap();
-                            (*lock).clone_from(&post);
-                        },
-                        None => {
-                            map.insert(post.id.clone(), RwLock::new(post));
-                        },
-                    }
+                    map.insert(post.id.clone(), post);
                 },
                 None => (),
             }
         }
     }
+    // TODO: hash(user)→first_post_id
+    //   How do we update this? Maybe, `update` should check post.access_hash, and update the entry in this if not present?
+    // TODO: to_url_part(content)→post_id (like 2020_first_line if not taken)
+    //   Should this be auto-filled too?
+    // TODO: How should we handle login?...
 }

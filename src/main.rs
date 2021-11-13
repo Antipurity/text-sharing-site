@@ -21,7 +21,7 @@ use serde_json::json;
 use cookie::Cookie;
 
 
-// TODO: Stores for posts and access_hash→first_post_id and URL name→id (name is like 2020/first_line if no overlaps).
+// TODO: Stores for posts and access_hash→first_post_id and URL name→id (name is like 2020_first_line if no overlaps).
 //   TODO: Use Firebase as the database.
 // TODO: fn login(user): None if access_token_hash(user) is not in the database, Some(first_post_id) otherwise.
 //   Need a database for this, though. And be in another file.

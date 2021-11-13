@@ -9,7 +9,6 @@
     <p>Hi from Rust</p>
     <p>User: {{user}}</p>
     {{#with (GetPostById post user)}}
-      <p>This: {{this}}</p>
       <p>Reward: {{GetPostReward post}}</p>
       {{#if (GetEditable this ../user)}}
         <p>Can edit</p>
