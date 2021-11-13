@@ -94,8 +94,8 @@ impl Post {
         }
     }
     /// Changes a post's content and its openness-to-comments status.
-    pub fn edit(self: Post, user: String, content: String, children_rights: Vec<String>) -> Option<Post> {
-        if access_token_hash(&user) == self.access_hash {
+    pub fn edit(self: Post, user: &str, content: String, children_rights: Vec<String>) -> Option<Post> {
+        if access_token_hash(user) == self.access_hash {
             Some(Post {
                 content,
                 children_rights,
@@ -141,7 +141,7 @@ impl Post {
             "user_reward": match user {
                 Some(u) => u.rewarded_posts.get(&self.id).map_or(0i8, |r| *r),
                 None => 0i8,
-             },
+            },
             "parent_id": self.parent_id,
             "children_rights": self.children_rights,
             "children": self.children_ids.len(),

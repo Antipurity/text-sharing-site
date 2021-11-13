@@ -27,12 +27,13 @@ pub enum Which {
     GetParentId, // post → post_id
     GetSummary, // post → string (the first line of content)
     GetContent, // post → string (the whole Markdown content, parsed into HTML)
-    GetPostChildren, // post, page_index → array<post>
+    GetPostChildren, // post, user, page_index → array<post>
     GetPostChildrenLength, // post → length
     GetUserRewards, // user, page_index → array<post>
     GetUserRewardsLength, // user → length
     GetUserPosts, // user, page_index → array<post>
     GetUserPostsLength, // user → length
+    // (All this authentication is a LOT of hashing and DB lookups per page-view. So uncivilized.)
 }
 
 
@@ -53,12 +54,19 @@ impl HelperDef for PostHelper {
         let arg = |i| h.param(i).unwrap().value();
         let str_arg = |i| arg(i).as_str().unwrap();
         let i64_arg = |i| arg(i).as_i64().unwrap();
+        let auth = |user| match self.data.login(user).map(|fpi| self.data.read(vec![&fpi]).pop().unwrap()) {
+            Some(Some(first_post)) => Some(first_post),
+            _ => None,
+        };
         let f = |x| Ok(Some(ScopedJson::from(x)));
         f(match &self.which {
-            Which::GetPostById => match self.data.read(vec![str_arg(0)])[0] {
-                Some(ref post) => post.to_json(None), // TODO: Needs the user: Some(&Post). Read from the database. ...Or accept as a JSON value, and have `GetUserFirstPost(access_token)`?
-                // TODO: `posts_store` should have support for getting and setting a user's first post! (Maybe even automatic, by `read` and `update`.)
-                None => json!(null),
+            Which::GetPostById => {
+                let first_post = auth(str_arg(1));
+                let first_post_ref = first_post.as_ref();
+                match self.data.read(vec![str_arg(0)])[0] {
+                    Some(ref post) => post.to_json(first_post_ref),
+                    None => json!(null),
+                }
             },
             Which::GetPostReward => match arg(0).get("post_reward") {
                 Some(v) => json!(v.as_i64().unwrap()),
@@ -105,12 +113,14 @@ impl HelperDef for PostHelper {
             Which::GetPostChildren => match arg(0).get("id").map(|v| v.as_str()) {
                 Some(Some(v)) => match self.data.read(vec![v])[0] {
                     Some(ref post) => {
-                        let start:usize = (i64_arg(1) * PAGE_LEN) as usize;
+                        let first_post = auth(str_arg(1));
+                        let first_post_ref = first_post.as_ref();
+                        let start:usize = (i64_arg(2) * PAGE_LEN) as usize;
                         let end:usize = start + PAGE_LEN as usize;
                         let ch = post.get_children_newest_first(start, end).unwrap();
                         let ch = self.data.read(ch.iter().map(|s| &s[..]).collect());
                         json!(ch.iter().map(|maybe_post| match maybe_post {
-                            Some(post) => post.to_json(None), // TODO: We also need the user if we're gonna be converting stuff to JSON.
+                            Some(post) => post.to_json(first_post_ref),
                             None => json!(null),
                         }).collect::<handlebars::JsonValue>())
                     },
