@@ -162,11 +162,7 @@ impl Post {
                 None => 0i8,
             },
             "parent_id": self.parent_id,
-            "children_rights": match self.children_rights {
-                CanPost::None => "none",
-                CanPost::Itself => "itself",
-                CanPost::All => "all",
-            },
+            "children_rights": self.children_rights.to_string(),
             "children": self.children_ids.len(),
             "access_hash": self.access_hash,
         })
@@ -215,5 +211,28 @@ impl Post {
     }
     pub fn get_created_posts_length(&self) -> usize {
         self.created_post_ids.len()
+    }
+}
+
+
+
+impl ToString for CanPost {
+    fn to_string(&self) -> String {
+        match self {
+            Self::None => "none",
+            Self::Itself => "itself",
+            Self::All => "all",
+        }.to_string()
+    }
+}
+impl core::str::FromStr for CanPost {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "none" => Ok(Self::None),
+            "itself" => Ok(Self::Itself),
+            "all" => Ok(Self::All),
+            _ => Err(()),
+        }
     }
 }
