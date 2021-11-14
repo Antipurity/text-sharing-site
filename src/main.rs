@@ -6,6 +6,7 @@ use std::sync::Arc;
 mod posts_api;
 mod posts_store;
 mod posts_helpers;
+use posts_api::{Post, CanPost};
 
 extern crate iron;
 extern crate staticfile;
@@ -52,9 +53,9 @@ fn main() {
     }
 
     let data = Arc::new(posts_store::Database::new());
-    data.update(vec![""], |_: Vec<Option<posts_api::Post>>| {
+    data.update(vec![""], |_: Vec<Option<Post>>| {
         println!("Creating the initial post..."); // TODO
-        vec![Some(posts_api::Post::new_public(Some("".to_string()), "# The initial post\n\nWhy hello there. This is the public post.\n\n<script>console.log('JS injection')</script>".to_string()))]
+        vec![Some(Post::new_public(Some("".to_string()), "# The initial post\n\nWhy hello there. This is the public post.\n\n<script>console.log('JS injection')</script>".to_string()))]
     });
     posts_helpers::PostHelper::register(&mut templates, &data);
 
@@ -85,7 +86,7 @@ fn main() {
             [""] => {
                 render(&templates, "post", &user, "")
             },
-            ["login"] if req.method == Method::Post => {
+            ["login"] if req.method == Method::Post => { // user
                 let map = req.get_ref::<Params>();
                 // It's unclear how the `params` crate deals with too-large requests.
                 //   But what's clear is that it's not my problem.
@@ -103,7 +104,7 @@ fn main() {
                             Some(_first_post_id) => {
                                 let cookie = "user=".to_owned() + access_token + "; Secure; HttpOnly";
                                 let h = Header(headers::SetCookie(vec![cookie]));
-                                Ok(Response::with((status::Ok, h, "")))
+                                Ok(Response::with((status::Ok, h, "OK")))
                             },
                             None => fail(),
                         }
@@ -111,14 +112,56 @@ fn main() {
                     _ => fail(),
                 }
             },
-            // ["new"] if req.method == Method::Post => {
-            //     let map = req.get_ref::<Params>();
-            //     // TODO: Get parent_id, content, children_rights ("none"|"self"|"all") from `map`.
-            //     //   ...How to do all that at the same time, though... Do we really have to go in sequence?
-            //     // TODO: crate::posts_api::Post::new(parent, user_first_post, content, children_rights) -> (user_first_post, parent, Option<child>)
-            //     //   And data.update(…)
-            //     // TODO: How to return the post?
-            // },
+            ["new"] if req.method == Method::Post => { // parent_id, content, rights
+                // This might be the longest implementation of a simple behavior I've ever seen.
+                //   And it's not even very efficient.
+                let map = req.get_ref::<Params>();
+                let fail = || {
+                    Err(IronError{
+                        error: Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "what are you even saying")),
+                        response: Response::with((status::BadRequest, "Bad data")),
+                    })
+                };
+                if map.is_err() {
+                    return fail();
+                }
+                let map = map.unwrap();
+                let get = |map: &params::Map, key: &str| -> Option<String> {
+                    let v = map.get(key);
+                    if v.is_none() { return None };
+                    let v = v.unwrap();
+                    if let params::Value::String(s) = v {
+                        Some(s.to_string())
+                    } else {
+                        None
+                    }
+                };
+                let (parent_id, content, rights) = (get(map, "parent_id"), get(map, "content"), get(map, "rights"));
+                if parent_id.is_none() || content.is_none() || rights.is_none() {
+                    return fail();
+                }
+                let (parent_id, content, rights) = (parent_id.unwrap(), content.unwrap(), rights.unwrap());
+                match data.login(&user) {
+                    Some(first_post_id) => {
+                        data.update(vec![&parent_id, &first_post_id], |mut posts| {
+                            let rights = rights.parse::<CanPost>();
+                            if rights.is_err() || posts.iter().any(|p| p.is_none()) {
+                                return vec![];
+                            };
+                            let (parent, first_post, rights) = (posts.remove(0).unwrap(), posts.remove(0).unwrap(), rights.unwrap());
+                            let (parent, first_post, maybe_child) = Post::new(parent, first_post, content, rights);
+                            vec![Some(parent), Some(first_post), maybe_child]
+                        });
+                        Ok(Response::with((status::Ok, "OK")))
+                    },
+                    None => {
+                        Err(IronError{
+                            error: Box::new(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Not logged in")),
+                            response: Response::with((status::Forbidden, "Not logged in")),
+                        })
+                    },
+                }
+            },
             /*
             ["edit", post_id, content, children_rights] => {
                 // TODO: post.edit(&user, &content, children_rights) -> Option<post>
