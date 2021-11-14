@@ -16,6 +16,16 @@ fn new_uuid() -> String {
 
 
 
+/// Who can create sub-posts in the parent post.
+#[derive(Clone)]
+pub enum CanPost {
+    None,
+    Itself,
+    All,
+}
+
+
+
 /// A post: a published piece of information, communicated through Markdown.
 /// 
 /// For example, a user is just another kind of post (with a new access_hash).
@@ -34,7 +44,7 @@ pub struct Post {
     pub content: String, // Intended to be Markdown, with the first line displayed as the title.
     reward: i64, // Less than -10 should get deleted.
     parent_id: String,
-    children_rights: Vec<String>, // An empty string, usually (must be empty to disallow comments).
+    children_rights: CanPost,
     children_ids: Vec<String>,
     rewarded_sum: i8,
     rewarded_posts: HashMap<String, i8>, // -100 (only own posts), -1, 1.
@@ -54,7 +64,7 @@ impl Post {
             content,
             reward: 0i64,
             parent_id: "".to_string(), // No parent.
-            children_rights: vec!["".to_string()], // Open to all comments.
+            children_rights: CanPost::All,
             children_ids: Vec::new(),
             rewarded_sum: 0i8,
             rewarded_posts: HashMap::new(),
@@ -63,9 +73,10 @@ impl Post {
     }
     /// Adds a new child-post to a parent-post.
     /// Returns (parent, user_first_post, Option<child>).
-    pub fn new(mut parent: Post, mut user_first_post: Post, content: String, children_rights: Vec<String>) -> (Post, Post, Option<Post>) {
+    pub fn new(mut parent: Post, mut user_first_post: Post, content: String, children_rights: CanPost) -> (Post, Post, Option<Post>) {
         let hash = &user_first_post.access_hash;
-        if parent.children_rights.iter().any(|s| s == "" || s == hash) {
+        let rights = &parent.children_rights;
+        if matches!(rights, CanPost::All) || matches!(rights, CanPost::Itself) && &parent.access_hash == hash {
             let id = new_uuid();
             user_first_post.created_post_ids.push(id.clone());
             parent.children_ids.push(id.clone());
@@ -94,7 +105,7 @@ impl Post {
         }
     }
     /// Changes a post's content and its openness-to-comments status.
-    pub fn edit(self: Post, user: &str, content: String, children_rights: Vec<String>) -> Option<Post> {
+    pub fn edit(self: Post, user: &str, content: String, children_rights: CanPost) -> Option<Post> {
         if access_token_hash(user) == self.access_hash {
             Some(Post {
                 content,
@@ -140,7 +151,7 @@ impl Post {
     }
 
     /// Returns `{ content, post_reward, user_reward, parent_id, children_rights }` as a JSON object. (`.to_string()` will convert it to a JSON string.)
-    /// `content` and `parent_id` are strings,  rewards are integers, `children_rights` is an array of strings.
+    /// `content` and `parent_id` are strings,  rewards are integers, `children_rights` is 'none'|'itself'|'all'.
     pub fn to_json(self: &Post, user: Option<&Post>) -> JsonValue {
         json!({
             "id": self.id,
@@ -151,7 +162,11 @@ impl Post {
                 None => 0i8,
             },
             "parent_id": self.parent_id,
-            "children_rights": self.children_rights,
+            "children_rights": match self.children_rights {
+                CanPost::None => "none",
+                CanPost::Itself => "itself",
+                CanPost::All => "all",
+            },
             "children": self.children_ids.len(),
             "access_hash": self.access_hash,
         })

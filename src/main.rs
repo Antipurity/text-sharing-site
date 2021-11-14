@@ -114,6 +114,7 @@ fn main() {
             // ["new"] if req.method == Method::Post => {
             //     let map = req.get_ref::<Params>();
             //     // TODO: Get parent_id, content, children_rights ("none"|"self"|"all") from `map`.
+            //     //   ...How to do all that at the same time, though...
             //     // TODO: crate::posts_api::Post::new(parent, user_first_post, content, children_rights) -> (user_first_post, parent, Option<child>)
             //     //   And data.update(…)
             //     // TODO: How to return the post?
