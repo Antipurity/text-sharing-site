@@ -111,13 +111,17 @@ fn main() {
                     _ => fail(),
                 }
             },
+            // ["new"] if req.method == Method::Post => {
+            //     let map = req.get_ref::<Params>();
+            //     // TODO: Get parent_id, content, children_rights ("none"|"self"|"all") from `map`.
+            //     // TODO: crate::posts_api::Post::new(parent, user_first_post, content, children_rights) -> (user_first_post, parent, Option<child>)
+            //     //   And data.update(…)
+            //     // TODO: How to return the post?
+            // },
             /*
-            ["new", parent_id, content, children_rights] => { // permissions:"none"|"self"|"all" // TODO: (Should probably be parsed from the body. req.body is the body, which we can apparently read... `use std::io::Read` and `req.body.take(4000000u64).read_to_string(&mut string)?`)
+            ["new", parent_id, content, children_rights] => { // permissions:"none"|"self"|"all"
                 //   https://docs.rs/formdata/0.13.0/formdata/ --- or maybe https://github.com/iron/params for more data formats...
                 // TODO: (Maybe, Posts should have an Enum for children_rights, not a vector? Would be way better, and less ambiguous.)
-                // TODO: crate::posts_api::Post::new(parent, user_first_post, content, children_rights) -> (user_first_post, parent, Option<child>)
-                //   And data.update(…)
-                // TODO: How to return the post?
             },
             ["edit", post_id, content, children_rights] => {
                 // TODO: post.edit(&user, &content, children_rights) -> Option<post>

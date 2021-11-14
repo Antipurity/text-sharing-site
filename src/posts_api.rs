@@ -62,7 +62,7 @@ impl Post {
         }
     }
     /// Adds a new child-post to a parent-post.
-    /// Returns (user_first_post, parent, Option<child>).
+    /// Returns (parent, user_first_post, Option<child>).
     pub fn new(mut parent: Post, mut user_first_post: Post, content: String, children_rights: Vec<String>) -> (Post, Post, Option<Post>) {
         let hash = &user_first_post.access_hash;
         if parent.children_rights.iter().any(|s| s == "" || s == hash) {
@@ -73,8 +73,8 @@ impl Post {
             let access_hash = hash.to_string();
             std::mem::drop(hash);
             (
-                user_first_post, // TODO: Make it the second result, not the first.
                 parent,
+                user_first_post,
                 Some(Post {
                     id,
                     access_hash,
@@ -90,7 +90,7 @@ impl Post {
                 })
             )
         } else {
-            (user_first_post, parent, None)
+            (parent, user_first_post, None)
         }
     }
     /// Changes a post's content and its openness-to-comments status.
