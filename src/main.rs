@@ -21,7 +21,6 @@ use iron::headers;
 use iron::modifiers::Header;
 use iron::error::IronError;
 use iron::status;
-use iron::method::Method;
 use params::{Params, Value};
 use staticfile::Static;
 use handlebars::Handlebars;
@@ -54,7 +53,7 @@ fn main() {
 
     let data = Arc::new(posts_store::Database::new());
     data.update(vec![""], |_: Vec<Option<Post>>| {
-        println!("Creating the initial post..."); // TODO
+        println!("Creating the initial post..."); // TODO: Remove.
         vec![Some(Post::new_public(Some("".to_string()), "# The initial post\n\nWhy hello there. This is the public post.\n\n<script>console.log('JS injection')</script>".to_string()))]
     });
     posts_helpers::PostHelper::register(&mut templates, &data);
@@ -108,7 +107,7 @@ fn main() {
             [""] => {
                 render(&templates, "post", &user, "")
             },
-            ["login"] if req.method == Method::Post => { // user
+            ["login"] => { // user
                 let map = req.get_ref::<Params>();
                 // It's unclear how the `params` crate deals with too-large requests.
                 //   But what's clear is that it's not my problem.
@@ -134,9 +133,10 @@ fn main() {
                     _ => fail(),
                 }
             },
-            ["new"] if req.method == Method::Post => { // parent_id, content, rights
+            ["new"] => { // parent_id, content, rights
                 // This might be the longest implementation of a simple behavior I've ever seen.
                 //   And it's not even very efficient.
+                //   Rust (and static typing in particular) forces a lot of boilerplate.
                 let map = req.get_ref::<Params>();
                 if map.is_err() { return fail() };
                 let map = map.unwrap();
@@ -147,9 +147,7 @@ fn main() {
                     match data.login(&user) {
                         Some(first_post_id) => {
                             data.update(vec![&parent_id, &first_post_id], |mut posts| {
-                                if posts.iter().any(|p| p.is_none()) {
-                                    return vec![];
-                                };
+                                if posts.iter().any(|p| p.is_none()) { return vec![] };
                                 let (parent, first_post) = (posts.remove(0).unwrap(), posts.remove(0).unwrap());
                                 let (parent, first_post, maybe_child) = Post::new(parent, first_post, content, rights);
                                 vec![Some(parent), Some(first_post), maybe_child]
@@ -181,13 +179,30 @@ fn main() {
                     fail()
                 }
             },
-            /*
-            ["reward", post_id, amount] => {
-                // TODO: Parse amount into i8, and fail if it is not -100, -1, 0, 1.
-                //   (Though I guess rewarding itself will fail if invalid range.)
-                // TODO: post.reward(user_first_post, amount)
+            ["reward"] => { // post_id, amount
+                let map = req.get_ref::<Params>();
+                if map.is_err() { return fail() };
+                let map = map.unwrap();
+                let (post_id, amount) = (get(map, "post_id"), get(map, "amount"));
+                if post_id.is_none() || amount.is_none() { return fail() };
+                let (post_id, amount) = (post_id.unwrap(), amount.unwrap());
+                if let Ok(amount) = amount.parse::<i8>() {
+                    match data.login(&user) {
+                        Some(first_post_id) => {
+                            data.update(vec![&post_id, &first_post_id], |mut posts| {
+                                if posts.iter().any(|p| p.is_none()) { return vec![] };
+                                let (post, first_post) = (posts.remove(0).unwrap(), posts.remove(0).unwrap());
+                                let (first_post, maybe_post) = post.reward(first_post, amount);
+                                vec![Some(first_post), maybe_post]
+                            });
+                            Ok(Response::with((status::Ok, "OK")))
+                        },
+                        None => not_logged_in(),
+                    }
+                } else {
+                    fail()
+                }
             },
-            */
             [template, post_id] if templates.has_template(template) => {
                 let post_id = data.lookup_url(post_id).unwrap_or_else(|| post_id.to_string());
                 render(&templates, &template, &user, &post_id)
