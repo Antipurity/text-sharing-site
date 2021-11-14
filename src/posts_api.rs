@@ -112,22 +112,29 @@ impl Post {
         if &self.access_hash == &user_first_post.access_hash {
             return (user_first_post, None)
         }
-        if amount != -100 && amount != -1 && amount != 1 { // TODO: Allow 0.
+        if amount != -100 && amount != -1 && amount != 0 && amount != 1 {
             return (user_first_post, None)
         };
         if amount == -100 && self.access_hash != user_first_post.access_hash {
             return (user_first_post, None)
         };
         if amount != -100 {
-            if user_first_post.rewarded_sum < -10 || user_first_post.rewarded_sum > 10 {
+            let will_be = user_first_post.rewarded_sum + amount;
+            if will_be < -10 || will_be > 10 {
                 return (user_first_post, None)
             }
             user_first_post.rewarded_sum += amount;
         };
-        // TODO: If the user has rewarded this post previously, allow changing the amount, by computing `delta` here.
-        *user_first_post.rewarded_posts.entry(self.id.clone()).or_insert(0i8) = amount; // TODO: If `amount` is 0, delete instead.
+        let map = &mut user_first_post.rewarded_posts;
+        let delta = if amount != 0 {
+            let old = map.insert(self.id.clone(), amount).unwrap_or(0i8);
+            amount - old
+        } else {
+            map.remove(&self.id);
+            0i8
+        };
         return (user_first_post, Some(Post{
-            reward: self.reward + (amount as i64), // TODO: Add `delta`, not `amount`.
+            reward: self.reward + (delta as i64),
             ..self
         }))
     }
