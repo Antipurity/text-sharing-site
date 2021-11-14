@@ -82,6 +82,28 @@ fn main() {
             None => "".to_string(),
         };
         // Actually handle the request, exposing the POST API.
+        let get = |map: &params::Map, key: &str| -> Option<String> {
+            let v = map.get(key);
+            if v.is_none() { return None };
+            let v = v.unwrap();
+            if let params::Value::String(s) = v {
+                Some(s.to_string())
+            } else {
+                None
+            }
+        };
+        let fail = || {
+            Err(IronError{
+                error: Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "what are you even saying")),
+                response: Response::with((status::BadRequest, "Bad data")),
+            })
+        };
+        let not_logged_in = || {
+            Err(IronError{
+                error: Box::new(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Not logged in")),
+                response: Response::with((status::Forbidden, "Not logged in")),
+            })
+        };
         match req.url.path()[..] {
             [""] => {
                 render(&templates, "post", &user, "")
@@ -116,58 +138,53 @@ fn main() {
                 // This might be the longest implementation of a simple behavior I've ever seen.
                 //   And it's not even very efficient.
                 let map = req.get_ref::<Params>();
-                let fail = || {
-                    Err(IronError{
-                        error: Box::new(std::io::Error::new(std::io::ErrorKind::InvalidInput, "what are you even saying")),
-                        response: Response::with((status::BadRequest, "Bad data")),
-                    })
-                };
-                if map.is_err() {
-                    return fail();
-                }
+                if map.is_err() { return fail() };
                 let map = map.unwrap();
-                let get = |map: &params::Map, key: &str| -> Option<String> {
-                    let v = map.get(key);
-                    if v.is_none() { return None };
-                    let v = v.unwrap();
-                    if let params::Value::String(s) = v {
-                        Some(s.to_string())
-                    } else {
-                        None
-                    }
-                };
                 let (parent_id, content, rights) = (get(map, "parent_id"), get(map, "content"), get(map, "rights"));
-                if parent_id.is_none() || content.is_none() || rights.is_none() {
-                    return fail();
-                }
+                if parent_id.is_none() || content.is_none() || rights.is_none() { return fail() };
                 let (parent_id, content, rights) = (parent_id.unwrap(), content.unwrap(), rights.unwrap());
-                match data.login(&user) {
-                    Some(first_post_id) => {
-                        data.update(vec![&parent_id, &first_post_id], |mut posts| {
-                            let rights = rights.parse::<CanPost>();
-                            if rights.is_err() || posts.iter().any(|p| p.is_none()) {
-                                return vec![];
-                            };
-                            let (parent, first_post, rights) = (posts.remove(0).unwrap(), posts.remove(0).unwrap(), rights.unwrap());
-                            let (parent, first_post, maybe_child) = Post::new(parent, first_post, content, rights);
-                            vec![Some(parent), Some(first_post), maybe_child]
-                        });
-                        Ok(Response::with((status::Ok, "OK")))
-                    },
-                    None => {
-                        Err(IronError{
-                            error: Box::new(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "Not logged in")),
-                            response: Response::with((status::Forbidden, "Not logged in")),
-                        })
-                    },
+                if let Ok(rights) = rights.parse::<CanPost>() {
+                    match data.login(&user) {
+                        Some(first_post_id) => {
+                            data.update(vec![&parent_id, &first_post_id], |mut posts| {
+                                if posts.iter().any(|p| p.is_none()) {
+                                    return vec![];
+                                };
+                                let (parent, first_post) = (posts.remove(0).unwrap(), posts.remove(0).unwrap());
+                                let (parent, first_post, maybe_child) = Post::new(parent, first_post, content, rights);
+                                vec![Some(parent), Some(first_post), maybe_child]
+                            });
+                            Ok(Response::with((status::Ok, "OK")))
+                        },
+                        None => not_logged_in(),
+                    }
+                } else {
+                    fail()
+                }
+            },
+            ["edit"] => { // post_id, content, rights
+                let map = req.get_ref::<Params>();
+                if map.is_err() { return fail() };
+                let map = map.unwrap();
+                let (post_id, content, rights) = (get(map, "post_id"), get(map, "content"), get(map, "rights"));
+                if post_id.is_none() || content.is_none() || rights.is_none() { return fail() };
+                let (post_id, content, rights) = (post_id.unwrap(), content.unwrap(), rights.unwrap());
+                if let Ok(rights) = rights.parse::<CanPost>() {
+                    data.update(vec![&post_id], |mut posts| {
+                        match posts.remove(0) {
+                            Some(post) => vec![post.edit(&user, content, rights)],
+                            None => vec![],
+                        }
+                    });
+                    Ok(Response::with((status::Ok, "OK")))
+                } else {
+                    fail()
                 }
             },
             /*
-            ["edit", post_id, content, children_rights] => {
-                // TODO: post.edit(&user, &content, children_rights) -> Option<post>
-            },
             ["reward", post_id, amount] => {
                 // TODO: Parse amount into i8, and fail if it is not -100, -1, 0, 1.
+                //   (Though I guess rewarding itself will fail if invalid range.)
                 // TODO: post.reward(user_first_post, amount)
             },
             */
