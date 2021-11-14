@@ -73,7 +73,7 @@ impl Post {
             let access_hash = hash.to_string();
             std::mem::drop(hash);
             (
-                user_first_post,
+                user_first_post, // TODO: Make it the second result, not the first.
                 parent,
                 Some(Post {
                     id,
@@ -112,7 +112,7 @@ impl Post {
         if &self.access_hash == &user_first_post.access_hash {
             return (user_first_post, None)
         }
-        if amount != -100 && amount != -1 && amount != 1 {
+        if amount != -100 && amount != -1 && amount != 1 { // TODO: Allow 0.
             return (user_first_post, None)
         };
         if amount == -100 && self.access_hash != user_first_post.access_hash {
@@ -124,9 +124,10 @@ impl Post {
             }
             user_first_post.rewarded_sum += amount;
         };
-        *user_first_post.rewarded_posts.entry(self.id.clone()).or_insert(0i8) = amount;
+        // TODO: If the user has rewarded this post previously, allow changing the amount, by computing `delta` here.
+        *user_first_post.rewarded_posts.entry(self.id.clone()).or_insert(0i8) = amount; // TODO: If `amount` is 0, delete instead.
         return (user_first_post, Some(Post{
-            reward: self.reward + (amount as i64),
+            reward: self.reward + (amount as i64), // TODO: Add `delta`, not `amount`.
             ..self
         }))
     }

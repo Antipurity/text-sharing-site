@@ -73,6 +73,8 @@ impl Database {
         return login.get(&crate::posts_api::access_token_hash(user)).map(|s| s.clone())
     }
     /// Converts a human-readable URL to the post ID, if present in the database.
+    /// To get a post's URL, read `post.human_readable_url`: an empty string if not assigned.
+    /// These URLs are auto-assigned, and will never collide with raw post IDs, nor with statically-served files (since these URLs are like `"2020_first_line_of_content"`).
     pub fn lookup_url(&self, url: &str) -> Option<String> {
         let mut human_lock = self.human_readable_url.write().unwrap();
         let human = &mut *human_lock;

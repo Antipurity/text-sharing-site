@@ -9,33 +9,27 @@ mod posts_helpers;
 
 extern crate iron;
 extern crate staticfile;
+extern crate params;
 extern crate handlebars;
 extern crate cookie;
 
 use iron::prelude::*;
 use iron::mime::*;
 use iron::Handler;
+use iron::headers;
+use iron::modifiers::Header;
+use iron::error::IronError;
+use iron::status;
+use iron::method::Method;
+use params::{Params, Value};
 use staticfile::Static;
 use handlebars::Handlebars;
 use serde_json::json;
 use cookie::Cookie;
 
 
-// TODO: Stores for posts and access_hash→first_post_id and URL name→id (name is like 2020_first_line if no overlaps).
-//   TODO: Use Firebase as the database.
-// TODO: fn login(user): None if access_token_hash(user) is not in the database, Some(first_post_id) otherwise.
-//   Need a database for this, though. And be in another file.
-//     ...Should we maybe use the same object as in `posts_store`, but store JSON strings and reconstruct posts from that JSON, and use other keys to access other data...
-//       (Would allow us to re-use the functions, except for parse-post. …Or maybe we should extract those, and have Post-processing be separate…)
-//     ...Also, `posts_store`'s `update` isn't actually atomic; the whole function should be protected by one write-lock to make that true (otherwise updates can get swallowed).
 
-
-
-// TODO: Specify each entry *exactly*. As string-taking+returning funcs.
-// TODO: A POST API (get it?) at `/api/*` that:
-//   TODO: allows viewing a post, editing post contents (if in-cookie session ID is OK), un/rewarding a post, creating a new post (also filling in the access_hash→post_id map), login (string to first post id).
-// TODO: Templating with Handlebars. (Because all-JS sites are getting boring.)
-//   TODO: Allow viewing (and editing if allowed) (and rewarding if logged in) a post & its children (with reward shown, along with the first line of Markdown contents, and first-lines of author contents), and a textfield & preview of a new post if you're allowed.
+//   TODO: UI: allow viewing (and editing if allowed) (and rewarding if logged in) a post & its children (with reward shown, along with the first line of Markdown contents, and first-lines of author contents), and a textfield & preview of a new post if you're allowed.
 //     (And a way to expand-all.)
 //     (And the post's username/password, switched by a checkbox to a file input (innovative), if anyone can post and not logged in (else it would be too irksome to see it everywhere). On submit, hash it client-side.)
 //       (The login page should transmit the header `Set-Cookie: user=…`.)
@@ -57,16 +51,6 @@ fn main() {
         }
     }
 
-    //   TODO: Helpers:
-    //     TODO: Login: from user's access-token (`user` here), get its first post ID or nothing.
-    //       ...How would we set the SetCookie header correctly, though... That would need to be some advanced state magic...
-    //   TODO: Helpers that edit posts, and report whether editing was successful:
-    //     TODO: New post, by user, in post, with content, with sub-posting by none/self/all. (Also creates an entry in URL name→id. …And if a new user, creates an entry in access_hash→first_post_id. These should be funcs in `Database`, shouldn't they?)
-    //       (Probably need to handle POST requests and parse form data to get the content.)
-    //     TODO: Edit post, by user, with content, with sub-posting by none/self/all.
-    //     TODO: Reward post, by user, by amount (-100|-1|1).
-    //     ...Or should all of these be not helpers, but actual POST-request handlers, parsing form data...
-    //       Login/logout should be like this too, right? Cookie-setting is contagious enough for this, right?
     let data = Arc::new(posts_store::Database::new());
     data.update(vec![""], |_: Vec<Option<posts_api::Post>>| {
         println!("Creating the initial post..."); // TODO
@@ -82,7 +66,7 @@ fn main() {
             "user": user,
             "post": post,
         })).unwrap();
-        Ok(Response::with((iron::mime::mime!(Text/Html), iron::status::Ok, body)))
+        Ok(Response::with((mime!(Text/Html), status::Ok, body)))
     };
     let chain = Chain::new(move |req: &mut Request| -> IronResult<Response> {
         // Get the `user=…` cookie. (It's a whole big process. The `cookie` library is questionably designed.)
@@ -96,15 +80,60 @@ fn main() {
             },
             None => "".to_string(),
         };
-        // Actually handle the request.
+        // Actually handle the request, exposing the POST API.
         match req.url.path()[..] {
-            [template] if templates.has_template(template) => {
-                render(&templates, template, &user, "")
+            [""] => {
+                render(&templates, "post", &user, "")
+            },
+            ["login"] if req.method == Method::Post => {
+                let map = req.get_ref::<Params>();
+                // It's unclear how the `params` crate deals with too-large requests.
+                //   But what's clear is that it's not my problem.
+                let fail = || { // Logout on failure.
+                    let cookie = "user=; Secure; HttpOnly".to_owned();
+                    let h = Header(headers::SetCookie(vec![cookie]));
+                    Err(IronError{
+                        error: Box::new(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "could not login")),
+                        response: Response::with((status::Forbidden, h, "Could not login")),
+                    })
+                };
+                match map.map(|m| m.find(&["user"])) {
+                    Ok(Some(&Value::String(ref access_token))) => {
+                        match data.login(access_token) {
+                            Some(_first_post_id) => {
+                                let cookie = "user=".to_owned() + access_token + "; Secure; HttpOnly";
+                                let h = Header(headers::SetCookie(vec![cookie]));
+                                Ok(Response::with((status::Ok, h, "")))
+                            },
+                            None => fail(),
+                        }
+                    },
+                    _ => fail(),
+                }
+            },
+            /*
+            ["new", parent_id, content, children_rights] => { // permissions:"none"|"self"|"all" // TODO: (Should probably be parsed from the body. req.body is the body, which we can apparently read... `use std::io::Read` and `req.body.take(4000000u64).read_to_string(&mut string)?`)
+                //   https://docs.rs/formdata/0.13.0/formdata/ --- or maybe https://github.com/iron/params for more data formats...
+                // TODO: (Maybe, Posts should have an Enum for children_rights, not a vector? Would be way better, and less ambiguous.)
+                // TODO: crate::posts_api::Post::new(parent, user_first_post, content, children_rights) -> (user_first_post, parent, Option<child>)
+                //   And data.update(…)
+                // TODO: How to return the post?
+            },
+            ["edit", post_id, content, children_rights] => {
+                // TODO: post.edit(&user, &content, children_rights) -> Option<post>
+            },
+            ["reward", post_id, amount] => {
+                // TODO: Parse amount into i8, and fail if it is not -100, -1, 0, 1.
+                // TODO: post.reward(user_first_post, amount)
+            },
+            */
+            [template, post_id] if templates.has_template(template) => {
+                let post_id = data.lookup_url(post_id).unwrap_or_else(|| post_id.to_string());
+                render(&templates, &template, &user, &post_id)
             },
             _ => match files.handle(req) {
                 Ok(x) => Ok(x),
                 Err(_) => {
-                    // TODO: Try serving post ID, else human-readable URL (that maps to post's ID), else 404.
                     render(&templates, "404", &user, "")
                 }
             },
