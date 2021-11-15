@@ -10,35 +10,38 @@
   </head>
   <body>
     <main>
-      <!-- TODO: How should the post be formatted? -->
-      <article class="top-level">
-        <!-- TODO: Zeroth, if not top-level, include a link to the parent. -->
-        <!--   TODO: ...The .to_json() API should expose the human-readable URL, right?... -->
-        <!-- TODO: First, a row, with the reward, un/rewarding buttons if logged in, and the summary. -->
-        <!-- TODO: Second, post content. -->
+      <!-- TODO: ...What about login?... How to login, show that we're logged in (via a link to our first post, and possibly its summary), and logout, all in the corner of every page?... -->
+      <article class="post top-level">
+        <!-- TODO: Zeroth, if not top-level, include a link to the parent. (Or maybe always.) (Do we want it to be human-readable? We'd need to read the parent post, right?) -->
+        <div class="summary">
+          <div class="reward">
+            <!-- TODO: If logged in, the "- reward" button, highlighted if the user gave it -1 reward. -->
+            <!--   ...How would we wire it up... JS, and data in attributes? -->
+            <!--   ...How would we even check whether we're logged in... -->
+            {{GetPostReward this}}
+            <!-- TODO: If logged in, the "+ reward" button, highlighted if the user gave it +1 reward. -->
+            <!--   ...How would we wire it up... JS, and data in attributes? -->
+            <!--   ...How would we even check whether we're logged in... -->
+          </div>
+          <strong>{{GetSummary this}}</strong>
+        </div>
+        <p>{{{(GetContent this)}}}</p>
         <!-- TODO: Third, the prompt to edit if (GetEditable this ../user), perhaps collapsed. -->
+        <!--   ...What do we include there... -->
         <!-- TODO: Fourth, the container of children. -->
         <!--   TODO: Fifth, the prompt to add a new child, if (GetPostable this ../user). -->
         <!--   TODO: Sixth, the list of pages unless there's only one, each except the current one a link to a page. -->
         <!--   TODO: Seventh, the list of children. -->
-        <p>Reward: {{GetPostReward post}}</p>
-        {{#if (GetEditable this ../user)}}
-          <p>Can edit</p>
-        {{else}}
-          <p>Cannot edit</p>
-        {{/if}}
-        {{#if (GetPostable this ../user)}}
-          <p>Can post here</p>
-        {{else}}
-          <p>Cannot post here</p>
-        {{/if}}
-        <p>Parent ID: {{GetParentId this}}</p>
-        <p>Summary: {{GetSummary this}}</p>
-        <p>{{{(GetContent this)}}}</p>
-        <p>Children, pages: {{GetPostChildrenLength this}}</p>
-        <p>Children, page 0: {{GetPostChildren this ../user 0}}</p>
         <div class="children">
+          <div class="children-pagination">
+            <!-- TODO: Also, maybe, display the raw child count? -->
+            <!-- TODO: How to do pagination? -->
+            {{GetPostChildrenLength this}} pages
+          </div>
           <!-- TODO: Display all the children here, as summaries. -->
+          <p>Children, page 0: {{GetPostChildren this ../user 0}}</p>
+          <!--   TODO: Uh, are these posts? Yeah. How to iterate over them? -->
+          <!--     (Would like to wrap their contents in <details>. And summaries should be human-readable URLs to them.) -->
         </div>
       </article>
       <!-- TODO: Write down all other visual components that we want. -->

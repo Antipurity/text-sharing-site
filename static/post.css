@@ -7,12 +7,20 @@ body {
 }
 body>main {
     min-width: 20em;
+    min-width: min(20em, calc(100% - 1em));
     width: 75%;
     box-shadow: 0 0 3px black;
     margin: .5em;
     padding: 1.5em;
     background-color: azure;
 }
-article.top-level {
-    /* TODO: What styles should we apply? */
+
+div.summary {
+    font-size: 1.5em;
+    /* TODO: ...Uh, how do we handle this... */
+}
+
+div.reward {
+    display: inline-block;
+    /* TODO: ...Uh, how do we handle this... */
 }

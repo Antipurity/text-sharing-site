@@ -165,7 +165,11 @@ impl Post {
             "children_rights": self.children_rights.to_string(),
             "children": self.children_ids.len(),
             "access_hash": self.access_hash,
-            "human_readable_url": "/post/".to_owned() + &self.human_readable_url,
+            "human_readable_url": "/post/".to_owned() + if &self.human_readable_url == "" {
+                &self.id
+            }  else {
+                &self.human_readable_url
+            },
         })
     }
 
