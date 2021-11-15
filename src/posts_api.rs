@@ -150,8 +150,8 @@ impl Post {
         }))
     }
 
-    /// Returns `{ content, post_reward, user_reward, parent_id, children_rights, children, access_hash }` as a JSON object. (`.to_string()` will convert it to a JSON string.)
-    /// `content` and `parent_id` are strings, rewards are integers, `children_rights` is 'none'|'itself'|'all', `children` is how many children this post has, `access_hash` is what the owner's access token must hash to.
+    /// Returns `{ content, post_reward, user_reward, parent_id, children_rights, children, access_hash, human_readable_url }` as a JSON object. (`.to_string()` will convert it to a JSON string.)
+    /// `content` and `parent_id` and `human_readable_url` are strings, rewards are integers, `children_rights` is 'none'|'itself'|'all', `children` is how many children this post has, `access_hash` is what the owner's access token must hash to.
     pub fn to_json(self: &Post, user: Option<&Post>) -> JsonValue {
         json!({
             "id": self.id,
@@ -165,6 +165,7 @@ impl Post {
             "children_rights": self.children_rights.to_string(),
             "children": self.children_ids.len(),
             "access_hash": self.access_hash,
+            "human_readable_url": "/post/".to_owned() + &self.human_readable_url,
         })
     }
 
