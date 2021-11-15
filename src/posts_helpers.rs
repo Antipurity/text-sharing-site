@@ -84,7 +84,7 @@ impl HelperDef for PostHelper {
             Which::GetNotTopLevel => {
                 match arg(0).get("id") {
                     Some(i) => match arg(0).get("parent_id") {
-                        Some(p) => json!(i == p),
+                        Some(p) => json!(i != p),
                         None => json!(false),
                     },
                     None => json!(false),
