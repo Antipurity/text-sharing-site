@@ -57,13 +57,14 @@ impl Post {
     /// Creates a new, top-level, open-to-comments, post.
     /// Exists because we have to root the post tree in *something*.
     pub fn new_public(id: Option<String>, content: String) -> Post {
+        let id = id.unwrap_or_else(|| new_uuid());
         Post {
-            id: id.unwrap_or_else(|| new_uuid()),
+            id: id.clone(),
             access_hash: "".to_string(), // No user can edit it (except for our own functions).
             human_readable_url: "".to_string(),
             content,
             reward: 0i64,
-            parent_id: "".to_string(), // No parent.
+            parent_id: id,
             children_rights: CanPost::All,
             children_ids: Vec::new(),
             rewarded_sum: 0i8,

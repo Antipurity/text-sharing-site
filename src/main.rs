@@ -61,10 +61,11 @@ fn main() {
 
 
     let templates = templates;
-    let render = |templates: &Handlebars, name: &str, user: &str, post: &str| {
+    let render = |templates: &Handlebars, name: &str, user: &str, post: &str, page:u64| {
         let body = templates.render(name, &json!({
             "user": user,
             "post": post,
+            "page": page,
         })).unwrap();
         Ok(Response::with((mime!(Text/Html), status::Ok, body)))
     };
@@ -105,7 +106,7 @@ fn main() {
         };
         match req.url.path()[..] {
             [""] => {
-                render(&templates, "post", &user, "")
+                render(&templates, "post", &user, "", 0)
             },
             ["login"] => { // user
                 let map = req.get_ref::<Params>();
@@ -205,12 +206,17 @@ fn main() {
             },
             [template, post_id] if templates.has_template(template) => {
                 let post_id = data.lookup_url(post_id).unwrap_or_else(|| post_id.to_string());
-                render(&templates, &template, &user, &post_id)
+                render(&templates, &template, &user, &post_id, 0)
+            },
+            [template, post_id, page] if templates.has_template(template) => {
+                let post_id = data.lookup_url(post_id).unwrap_or_else(|| post_id.to_string());
+                let page = page.parse::<u64>();
+                render(&templates, &template, &user, &post_id, page.unwrap_or(0))
             },
             _ => match files.handle(req) {
                 Ok(x) => Ok(x),
                 Err(_) => {
-                    render(&templates, "404", &user, "")
+                    render(&templates, "404", &user, "", 0)
                 }
             },
         }
