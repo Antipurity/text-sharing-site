@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-{{#with (GetPostById post user)}}
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -11,66 +10,7 @@
   <body>
     <main>
       <!-- TODO: ...What about login? How to login, show that we're logged in (via a link to our first post, and possibly its summary), and logout, all in the corner of every page?... -->
-      <article class="post top-level">
-        {{#if (GetNotTopLevel this)}}
-          <!-- TODO: ...Wait, why is this still shown... -->
-          <a href="{{lookup (GetPostById parent_id ../user) "human_readable_url"}}">↑ parent</a>
-        {{/if}}
-        <div class="summary">
-          <div class="reward">
-            <!-- TODO: (Make UI bearable, once we can see it, with login fully working.) -->
-            {{#if (GetEditable this ../user)}}
-              {{#if logged_in}}
-                <form action="/reward" method="post">
-                  <input type="hidden" name="post_id" value="{{id}}">
-                  <button class="btn {{#if (GetUserReward this -100)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="-100">delete</button>
-                </form>
-              {{/if}}
-            {{/if}}
-            {{#if logged_in}}
-              <form action="/reward" method="post">
-                <input type="hidden" name="post_id" value="{{id}}">
-                <button class="btn {{#if (GetUserReward this -1)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="-1">-</button>
-              </form>
-            {{/if}}
-            {{#if logged_in}}
-              <form action="/reward" method="post">
-                <input type="hidden" name="post_id" value="{{id}}">
-                <button class="btn {{#if (GetUserReward this 0)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="0">-</button>
-              </form>
-            {{else}}
-              {{GetPostReward this}}
-            {{/if}}
-            {{#if logged_in}}
-              <form action="/reward" method="post">
-                <input type="hidden" name="post_id" value="{{id}}">
-                <button class="btn {{#if (GetUserReward this 1)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="1">+</button>
-              </form>
-            {{/if}}
-          </div>
-          <strong>{{GetSummary this}}</strong>
-        </div>
-        <div class="content">{{{(GetContent this)}}}</div>
-        <!-- TODO: The collapsed prompt to edit if (GetEditable this ../user), given post_id,content,rights. -->
-        <div class="children">
-          <!-- TODO: The collapsed prompt to add a new child, if (GetPostable this ../user), given parent_id,content,rights. -->
-          <!--   TODO: ...Wait, how would we allow adding users: `new` reads the `user` cookie, but it's only set on `login`... Don't we need to pass in the intended user to `new`? -->
-          <div class="children-pagination">
-            <p>{{this.children}} comments</p>
-            <!-- TODO: How to do pagination? For each page, display a link to it unless it's the current page? But we'd like to only display the neighborhood and start/end... Should really have a helper, returning an array of page-indices... -->
-            {{GetPostChildrenLength this}} pages
-          </div>
-          {{#each (GetPostChildren this ../user ../page)}}
-            <!-- TODO: How to display the child's reward+summaries? Need to first finalize how the parent displays rewards, right? -->
-            CHILD: {{GetSummary this}}
-            <!-- TODO: (Would like to wrap their contents in <details>. And summaries should be human-readable URLs to them.) -->
-          {{/each}}
-        </div>
-      </article>
-      <!-- TODO: Write down all other visual components that we want. -->
-      <!--   ...Is that basically all we want, apart from user-specific stuff? ...Maybe said user-specific stuff should be in the post-viewer, detected when viewing the user's first post... -->
-      <!-- TODO: Also link to a JS script that iterates over all reward buttons and attaches appropriate click listener/s. -->
+      {{> one_post depth=0 post=(GetPostById post user) user=user page=page}}
     </main>
   </body>
 </html>
-{{/with}}
