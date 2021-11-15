@@ -15,9 +15,12 @@ body>main {
     background-color: azure;
 }
 
-div.summary {
+details.post {
+    border-bottom: 1px solid darkgoldenrod;
+}
+
+summary.summary-row {
     font-size: 1.5em;
-    /* TODO: ...Uh, how do we handle this... */
 }
 
 div.reward {
@@ -28,9 +31,10 @@ div.reward {
     flex-flow: row wrap;
     align-items: center;
     justify-content: center;
-    /* TODO: ...Uh, how do we handle this... How to create a border here? */
 }
 
-div.content {
-    border-bottom: 1px solid darkgoldenrod;
+div.comment-count {
+    float: right;
+    font-size: .6em;
+    line-height: 2.4em;
 }
