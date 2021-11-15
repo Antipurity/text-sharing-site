@@ -21,7 +21,7 @@ pub enum Which {
     // Viewing.
     GetPostById, // post_id, user → post
     GetPostReward, // post → num
-    GetUserReward, // post → num
+    GetUserReward, // post → num // TODO: Maybe, pass in the number, and return a boolean, so that we can highlight buttons easier?
     GetEditable, // post, user → bool
     GetPostable, // post, user → bool
     GetParentId, // post → post_id
