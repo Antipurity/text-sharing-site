@@ -119,10 +119,15 @@ impl HelperDef for PostHelper {
             },
             Which::GetContent => match arg(0).get("content").map(|v| v.as_str()) {
                 Some(Some(v)) => {
-                    let parser = Parser::new(v);
-                    let mut html_output = String::new();
-                    html::push_html(&mut html_output, parser);
-                    json!(ammonia::clean(&*html_output))
+                    match v.split_once('\n') {
+                        Some((_line, rest)) => {
+                            let parser = Parser::new(rest);
+                            let mut html_output = String::new();
+                            html::push_html(&mut html_output, parser);
+                            json!(ammonia::clean(&*html_output))
+                        },
+                        None => json!(v),
+                    }
                 },
                 _ => json!(""),
             },

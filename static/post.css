@@ -1,0 +1,18 @@
+body {
+    display: flex;
+    flex-flow: column wrap;
+    align-items: center;
+    justify-content: center;
+    background-color: lightgray;
+}
+body>main {
+    min-width: 20em;
+    width: 75%;
+    box-shadow: 0 0 3px black;
+    margin: .5em;
+    padding: 1.5em;
+    background-color: azure;
+}
+article.top-level {
+    /* TODO: What styles should we apply? */
+}

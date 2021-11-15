@@ -1,30 +1,48 @@
 <!DOCTYPE html>
+{{#with (GetPostById post user)}}
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Sample/test page</title>
+    <title>{{GetSummary this}}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <link href="/post.css" rel="stylesheet">
   </head>
   <body>
-    <h1>Hello!</h1>
-    <p>Hi from Rust</p>
-    <p>User: {{user}}</p>
-    {{#with (GetPostById post user)}}
-      <p>Reward: {{GetPostReward post}}</p>
-      {{#if (GetEditable this ../user)}}
-        <p>Can edit</p>
-      {{else}}
-        <p>Cannot edit</p>
-      {{/if}}
-      {{#if (GetPostable this ../user)}}
-        <p>Can post here</p>
-      {{else}}
-        <p>Cannot post here</p>
-      {{/if}}
-      <p>Parent ID: {{GetParentId this}}</p>
-      <p>Summary: {{GetSummary this}}</p>
-      <p>{{{(GetContent this)}}}</p>
-      <p>Children, pages: {{GetPostChildrenLength this}}</p>
-      <p>Children, page 0: {{GetPostChildren this ../user 0}}</p>
-    {{/with}}
+    <main>
+      <!-- TODO: How should the post be formatted? -->
+      <article class="top-level">
+        <!-- TODO: Zeroth, if not top-level, include a link to the parent. -->
+        <!--   TODO: ...The .to_json() API should expose the human-readable URL, right?... -->
+        <!-- TODO: First, a row, with the reward, un/rewarding buttons if logged in, and the summary. -->
+        <!-- TODO: Second, post content. -->
+        <!-- TODO: Third, the prompt to edit if (GetEditable this ../user), perhaps collapsed. -->
+        <!-- TODO: Fourth, the container of children. -->
+        <!--   TODO: Fifth, the prompt to add a new child, if (GetPostable this ../user). -->
+        <!--   TODO: Sixth, the list of pages unless there's only one, each except the current one a link to a page. -->
+        <!--   TODO: Seventh, the list of children. -->
+        <p>Reward: {{GetPostReward post}}</p>
+        {{#if (GetEditable this ../user)}}
+          <p>Can edit</p>
+        {{else}}
+          <p>Cannot edit</p>
+        {{/if}}
+        {{#if (GetPostable this ../user)}}
+          <p>Can post here</p>
+        {{else}}
+          <p>Cannot post here</p>
+        {{/if}}
+        <p>Parent ID: {{GetParentId this}}</p>
+        <p>Summary: {{GetSummary this}}</p>
+        <p>{{{(GetContent this)}}}</p>
+        <p>Children, pages: {{GetPostChildrenLength this}}</p>
+        <p>Children, page 0: {{GetPostChildren this ../user 0}}</p>
+        <div class="children">
+          <!-- TODO: Display all the children here, as summaries. -->
+        </div>
+      </article>
+      <!-- TODO: Write down all other visual components that we want. -->
+    </main>
   </body>
 </html>
+{{/with}}
