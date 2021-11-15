@@ -21,7 +21,7 @@ pub enum Which {
     // Viewing.
     GetPostById, // post_id, user → post
     GetPostReward, // post → num
-    GetUserReward, // post → num // TODO: Maybe, pass in the number, and return a boolean, so that we can highlight buttons easier?
+    GetUserReward, // post, num → bool (checks equality, for coloring buttons)
     GetEditable, // post, user → bool
     GetPostable, // post, user → bool
     GetParentId, // post → post_id
@@ -84,9 +84,12 @@ impl HelperDef for PostHelper {
                 Some(v) => json!(v.as_i64().unwrap()),
                 None => json!(0i64),
             },
-            Which::GetUserReward => match arg(0).get("user_reward") {
-                Some(v) => json!(v.as_i64().unwrap()),
-                None => json!(0i64),
+            Which::GetUserReward => {
+                let expect = arg(1).as_i64().unwrap();
+                match arg(0).get("user_reward") {
+                    Some(v) => json!(v.as_i64().unwrap() == expect),
+                    None => json!(0i64 == expect),
+                }
             },
             Which::GetEditable => match arg(0).get("access_hash").map(|v| v.as_str()) {
                 Some(Some(v)) => json!(v == access_token_hash(str_arg(1))),
