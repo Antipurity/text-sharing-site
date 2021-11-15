@@ -15,14 +15,35 @@
         <!-- TODO: Zeroth, if not top-level, include a link to the parent. (Or maybe always.) (Do we want it to be human-readable? We'd need to read the parent post, right? I guess it's not *that* much of a problem.) -->
         <div class="summary">
           <div class="reward">
-            <button post_id={{id}} amount=-1>-</button>
-            <!-- TODO: ...How would we even check whether we're logged in, not displaying the button if not so... -->
-            <!-- TODO: How to highlight the button above if the user gave -1 reward? -->
-            {{GetPostReward this}}
-            <!-- TODO: If logged in, the "+" button, highlighted if the user gave it +1 reward. -->
-            <!--   ...How would we wire it up... JS, and data in attributes post_id/amount? -->
-            <!--   ...How would we even check whether we're logged in... -->
-            <!-- TODO: If (GetEditable this ../user), also the "delete" button (-100 reward). -->
+            <!-- TODO: (Make UI bearable, once we can see it, with login fully working.) -->
+            {{#if (GetEditable this ../user)}}
+              {{#if logged_in}}
+                <form action="/reward" method="post">
+                  <input type="hidden" name="post_id" value="{{id}}">
+                  <button class="btn {{#if (GetUserReward this -100)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="-100">delete</button>
+                </form>
+              {{/if}}
+            {{/if}}
+            {{#if logged_in}}
+              <form action="/reward" method="post">
+                <input type="hidden" name="post_id" value="{{id}}">
+                <button class="btn {{#if (GetUserReward this -1)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="-1">-</button>
+              </form>
+            {{/if}}
+            {{#if logged_in}}
+              <form action="/reward" method="post">
+                <input type="hidden" name="post_id" value="{{id}}">
+                <button class="btn {{#if (GetUserReward this 0)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="0">-</button>
+              </form>
+            {{else}}
+              {{GetPostReward this}}
+            {{/if}}
+            {{#if logged_in}}
+              <form action="/reward" method="post">
+                <input type="hidden" name="post_id" value="{{id}}">
+                <button class="btn {{#if (GetUserReward this 1)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="1">+</button>
+              </form>
+            {{/if}}
           </div>
           <strong>{{GetSummary this}}</strong>
         </div>
