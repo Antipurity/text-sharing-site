@@ -56,7 +56,7 @@ impl Database {
                     login.insert(post.access_hash.clone(), key.clone());
                 }
                 if post.human_readable_url == "" {
-                    post.human_readable_url = to_url_part(&post.content)
+                    post.human_readable_url = to_url_part(&post.content);
                 }
                 if !human.contains_key(&post.human_readable_url) {
                     human.insert(post.human_readable_url.clone(), post.id.clone());
@@ -86,7 +86,11 @@ impl Database {
 
 fn to_url_part(content: &str) -> String {
     let year = chrono::Utc::now().year().to_string();
-    let simpler = content.replace(|c:char| !c.is_ascii(), "_");
+    let simpler = match content.split_once('\n') {
+        Some((line, _rest)) => line,
+        None => content,
+    };
+    let simpler = simpler.replace(|c:char| !c.is_ascii_alphanumeric(), "_");
     let simpler = simpler.split('_').filter(|s| s.len() > 0).collect::<Vec<&str>>().join("_");
     let simpler = simpler.to_ascii_lowercase();
     year + "_" + if simpler.len() < 80 { &simpler } else { &simpler[..80] }

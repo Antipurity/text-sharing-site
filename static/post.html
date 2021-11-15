@@ -12,7 +12,10 @@
     <main>
       <!-- TODO: ...What about login? How to login, show that we're logged in (via a link to our first post, and possibly its summary), and logout, all in the corner of every page?... -->
       <article class="post top-level">
-        <!-- TODO: Zeroth, if not top-level, include a link to the parent. (Or maybe always.) (Do we want it to be human-readable? We'd need to read the parent post, right? I guess it's not *that* much of a problem.) -->
+        {{#if (GetNotTopLevel this)}}
+          <!-- TODO: ...Wait, why is this still shown... -->
+          <a href="{{lookup (GetPostById parent_id ../user) "human_readable_url"}}">↑ parent</a>
+        {{/if}}
         <div class="summary">
           <div class="reward">
             <!-- TODO: (Make UI bearable, once we can see it, with login fully working.) -->

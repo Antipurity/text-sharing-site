@@ -20,6 +20,7 @@ const PAGE_LEN: i64 = 50;
 pub enum Which {
     // Viewing.
     GetPostById, // post_id, user → post
+    GetNotTopLevel, // post → bool
     GetPostReward, // post → num
     GetUserReward, // post, num → bool (checks equality, for coloring buttons)
     GetEditable, // post, user → bool
@@ -78,6 +79,15 @@ impl HelperDef for PostHelper {
                 match post(str_arg(0).to_string()) {
                     Some(ref post) => post.to_json(first_post_ref),
                     None => json!(null),
+                }
+            },
+            Which::GetNotTopLevel => {
+                match arg(0).get("id") {
+                    Some(i) => match arg(0).get("parent_id") {
+                        Some(p) => json!(i == p),
+                        None => json!(false),
+                    },
+                    None => json!(false),
                 }
             },
             Which::GetPostReward => match arg(0).get("post_reward") {
@@ -190,6 +200,7 @@ impl PostHelper {
     pub fn register<'reg>(templates: &mut Handlebars<'reg>, d: &Arc<Database>) {
         let mut f = |s, t| templates.register_helper(s, Box::new(PostHelper{ which:t, data:d.clone() }));
         f("GetPostById", Which::GetPostById);
+        f("GetNotTopLevel", Which::GetNotTopLevel);
         f("GetPostReward", Which::GetPostReward);
         f("GetUserReward", Which::GetUserReward);
         f("GetEditable", Which::GetEditable);
