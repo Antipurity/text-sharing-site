@@ -34,6 +34,7 @@ pub enum Which {
     GetUserRewardedLength, // user → length
     GetUserPosts, // user, page_index → array<post>
     GetUserPostsLength, // user → length
+    IsLoggedIn, // user → bool
     Plus1, // num → num (for recursion, to increment `depth`)
     Less, // num, num → bool
     // (All this authentication is a LOT of hashing and DB lookups per page-view. So uncivilized.)
@@ -194,6 +195,7 @@ impl HelperDef for PostHelper {
                     None => json!(0),
                 }
             },
+            Which::IsLoggedIn => json!(str_arg(0) != ""),
             Which::Plus1 => json!(i64_arg(0) + 1),
             Which::Less => json!(i64_arg(0) < i64_arg(1)),
         })
@@ -218,6 +220,7 @@ impl PostHelper {
         f("GetUserRewardedLength", Which::GetUserRewardedLength);
         f("GetUserPosts", Which::GetUserPosts);
         f("GetUserPostsLength", Which::GetUserPostsLength);
+        f("IsLoggedIn", Which::IsLoggedIn);
         f("Plus1", Which::Plus1);
         f("Less", Which::Less);
     }

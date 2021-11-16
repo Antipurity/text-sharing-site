@@ -4,20 +4,18 @@
   {{/if}}
   <details open class="post">
     <summary>
-      {{> post_header}}
+      {{> post_header depth=depth post=post user=user}}
     </summary>
     <!-- TODO: The collapsed prompt to edit if (GetEditable post ../user), given post_id,content,rights. -->
     {{#if (Less depth 1)}}
       <div class="content">{{{(GetContent post)}}}</div>
-      <!-- TODO: The collapsed prompt to add a new child, if (GetPostable post ../user), given parent_id,content,rights,user. -->
-      <!--   TODO: Have `user_form_elem.html`: if logged in, be nothing (a hidden input `name="user"`, rather), else a checkbox: if not checked, username+password, else username+file. MUST have JS to set the hidden input's value to the hash of the entered info. -->
-      <!--   TODO: Have `edit_post.html`, to extract functionality. -->
+      {{> post_new_child depth=depth post=post user=user}}
       <div class="children-pagination">
         <!-- TODO: How to do pagination? For each page, display a link to it unless it's the current page? But we'd like to only display the neighborhood and start/end... Should really have a helper, returning an array of page-indices... -->
         {{GetPostChildrenLength post}} pages
       </div>
       {{#each (GetPostChildren post ../user ../page)}}
-        {{> one_post depth=(Plus1 depth) post=(GetPostById post user) user=user page=0}}
+        {{> one_post depth=(Plus1 depth) post=this user=user page=0}}
       {{/each}}
     {{/if}}
   </details>

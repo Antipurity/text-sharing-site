@@ -1,0 +1,55 @@
+{{#if (IsLoggedIn user)}}
+{{else}}
+  <div class="user_elems margin">
+    <input class="form-check-input form-check-inline switch js-controls-hash" type="checkbox">
+    <div class="switch-options">
+      <div class="switch-off">
+        <div class="row">
+          <div class="col">
+            <input class="form-control js-gives-hash" type="text" id="username" placeholder="Username">
+          </div>
+          <div class="col">
+            <input class="form-control js-gives-hash" type="password" id="password" placeholder="Password">
+          </div>
+        </div>
+      </div>
+      <div class="custom-file switch-on">
+        <input class="custom-file-input js-gives-hash" style="visibility:hidden; position:absolute; pointer-events:none" type="file" id="accessFile">
+        <label class="custom-file-label" style="font-size:1.6em" for="accessFile">
+          <div class="btn btn-outline-secondary" type="button" tabindex="0">Browse</div>
+          The access file…
+        </label>
+      </div>
+    </div>
+  </div>
+  <small class="form-text text-muted">Authentication: to confirm that it's you, this has to be reproduced exactly on each login attempt. If possible, use a file to not strain your memory while maintaining security; don't lose it.</small>
+{{/if}}
+<input class="js-receives-hash" type="hidden" name="user" value="{{user}}">
+<script>
+  // Safe to include multiple times.
+  ;(function() {
+    const which = document.querySelector('.js-controls-hash')
+    const output = document.querySelector('.js-receives-hash')
+    document.querySelectorAll('.js-gives-hash').forEach(gives => gives.onchange = onChange)
+    function onChange() {
+      if (!which.checked) { // username+password
+        const u = document.querySelector('#username')
+        const p = document.querySelector('#password')
+        updateHash('fesmoerntuno;erfiern;4fonini' + u.value + 'frnfni3fn3ini3fn934' + p.value + ' gnni niin35')
+      } else { // file
+        const f = document.querySelector('#accessFile')
+        const r = new FileReader
+        r.onload = evt => updateHash(evt.target.result)
+        r.readAsText(f.files[0])
+      }
+    }
+    function updateHash(str) {
+      if (typeof crypto != 'undefined' && crypto.subtle && crypto.subtle.digest)
+        crypto.subtle.digest('SHA-256', new TextEncoder().encode(str))
+        .then(b => Array.from(new Uint8Array(b)).map(c=>c.toString(16).padStart(2, '0')).join(''))
+        .then(hash => output.value = hash)
+      else
+        output.value = str.slice(0,64)
+    }
+  })()
+</script>

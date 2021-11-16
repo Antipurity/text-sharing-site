@@ -1,0 +1,18 @@
+{{#if (GetPostable post user)}}
+  <details class="new_child_container">
+    <summary>Comment</summary>
+    <form action="/new" method="post">
+      {{> post_user_form_elem depth=depth post=post user=user}}
+      <textarea class="form-control margin" name="content" placeholder="# Title
+
+Have you ever heard about" rows="7" required></textarea>
+      <small class="form-text text-muted"><a href="https://commonmark.org/help/">Markdown</a> content: use text, images, lists etc to convey your message to the world. The first line should summarize it.</small>
+      <select class="form-control margin" name="rights">
+        <option value="all" selected>Open to comments</option>
+        <option value="itself">Only the author can comment</option>
+        <option value="none">No comments</option>
+      </select>
+      <button class="btn btn-primary full-width" name="parent_id" value="{{lookup post "id"}}">Comment</button>
+    </form>
+  </details>
+{{/if}}
