@@ -19,8 +19,9 @@ details.post {
     border-bottom: 1px solid darkgoldenrod;
 }
 
-summary.summary-row {
+div.summary-row {
     font-size: 1.5em;
+    display: inline;
 }
 
 div.reward {
