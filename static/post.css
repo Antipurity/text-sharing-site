@@ -79,12 +79,22 @@ div.user_elems {
     visibility: visible;
 }
 
-details {
-    box-shadow: -1px 0 1px lightgray;
-}
-
 input.js-controls-hash {
     width: 1rem;
     height: 1rem;
     margin: .7rem;
+}
+
+details {
+    box-shadow: -1px 0 1px lightgray;
+}
+
+details[open=""]>:not(summary) {
+    animation: rotateDown .3s;
+    transform-origin: top center;
+}
+
+@keyframes rotateDown {
+    0% { transform: rotate3d(1,0,0, 90deg) }
+    100% { transform: rotate3d(1,0,0,0) }
 }
