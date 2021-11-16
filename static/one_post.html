@@ -41,6 +41,7 @@
         <a href="{{lookup post "human_readable_url"}}"><strong>{{GetSummary post}}</strong></a>
       {{/if}}
       <div class="comment-count">{{post.children}} comments</div>
+      <!-- TODO: ...Shouldn't we also fetch the post's author, and its first-post, and display *its* summary, to tell who the post's by?... -->
     </summary>
     <!-- TODO: The collapsed prompt to edit if (GetEditable post ../user), given post_id,content,rights. -->
     {{#if (Less depth 1)}}

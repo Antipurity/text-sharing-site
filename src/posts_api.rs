@@ -73,23 +73,23 @@ impl Post {
         }
     }
     /// Adds a new child-post to a parent-post.
-    /// Returns (parent, user_first_post, Option<child>).
-    pub fn new(mut parent: Post, mut user_first_post: Post, content: String, children_rights: CanPost) -> (Post, Post, Option<Post>) {
-        let hash = &user_first_post.access_hash;
+    /// `user_first_post` must be `posts_store::Database::login(self, access_hash).map(|id| database.read(vec![id]).remove(0))`.
+    /// Returns (parent, Option<user_first_post>, Option<child>).
+    pub fn new(mut parent: Post, access_hash: &str, mut user_first_post: Option<Post>, content: String, children_rights: CanPost) -> (Post, Option<Post>, Option<Post>) {
         let rights = &parent.children_rights;
-        if matches!(rights, CanPost::All) || matches!(rights, CanPost::Itself) && &parent.access_hash == hash {
+        if matches!(rights, CanPost::All) || matches!(rights, CanPost::Itself) && &parent.access_hash == access_hash {
             let id = new_uuid();
-            user_first_post.created_post_ids.push(id.clone());
+            if let Some(ref mut post) = user_first_post {
+                post.created_post_ids.push(id.clone());
+            }
             parent.children_ids.push(id.clone());
             let parent_id = parent.id.clone();
-            let access_hash = hash.to_string();
-            std::mem::drop(hash);
             (
                 parent,
                 user_first_post,
                 Some(Post {
                     id,
-                    access_hash,
+                    access_hash: access_hash.to_string(),
                     human_readable_url: "".to_string(),
                     content,
                     reward: 0i64,

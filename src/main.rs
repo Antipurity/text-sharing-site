@@ -29,8 +29,7 @@ use cookie::Cookie;
 
 
 
-//   TODO: UI: allow viewing (and editing if allowed) (and rewarding if logged in) a post & its children (with reward shown, along with the first line of Markdown contents, and first-lines of author contents), and a textfield & preview of a new post if you're allowed.
-//     (And a way to expand-all.)
+//   TODO: UI: allow editing if allowed a post & its children, and a textfield & preview of a new post if you're allowed.
 //     (And the post's username/password, switched by a checkbox to a file input (innovative), if anyone can post and not logged in (else it would be too irksome to see it everywhere). On submit, hash it client-side.)
 //       (The login page should transmit the header `Set-Cookie: user=…`.)
 //     (And if the "" post does not exist, allow creating it.)
@@ -134,29 +133,30 @@ fn main() {
                     _ => fail(),
                 }
             },
-            ["new"] => { // parent_id, content, rights
+            ["new"] => { // parent_id, content, rights, user
                 // This might be the longest implementation of a simple behavior I've ever seen.
                 //   And it's not even very efficient.
                 //   Rust (and static typing in particular) forces a lot of boilerplate.
                 let map = req.get_ref::<Params>();
                 if map.is_err() { return fail() };
                 let map = map.unwrap();
-                let (parent_id, content, rights) = (get(map, "parent_id"), get(map, "content"), get(map, "rights"));
-                if parent_id.is_none() || content.is_none() || rights.is_none() { return fail() };
-                let (parent_id, content, rights) = (parent_id.unwrap(), content.unwrap(), rights.unwrap());
+                let (parent_id, content, rights, user) = (get(map, "parent_id"), get(map, "content"), get(map, "rights"), get(map, "user"));
+                if parent_id.is_none() || content.is_none() || rights.is_none() || user.is_none() { return fail() };
+                let (parent_id, content, rights, user) = (parent_id.unwrap(), content.unwrap(), rights.unwrap(), user.unwrap());
                 if let Ok(rights) = rights.parse::<CanPost>() {
-                    match data.login(&user) {
-                        Some(first_post_id) => {
-                            data.update(vec![&parent_id, &first_post_id], |mut posts| {
-                                if posts.iter().any(|p| p.is_none()) { return vec![] };
-                                let (parent, first_post) = (posts.remove(0).unwrap(), posts.remove(0).unwrap());
-                                let (parent, first_post, maybe_child) = Post::new(parent, first_post, content, rights);
-                                vec![Some(parent), Some(first_post), maybe_child]
-                            });
-                            Ok(Response::with((status::Ok, "OK")))
-                        },
-                        None => not_logged_in(),
-                    }
+                    let maybe_first_post_id = data.login(&user);
+                    let ids: Vec<&str> = vec![&parent_id, match maybe_first_post_id {
+                        Some(ref first_post_id) => first_post_id,
+                        None => "rfnerfbue4ntbweubiteruiertbnerngdoisfnoidn", // Should be non-existent.
+                    }];
+                    data.update(ids, |mut posts| {
+                        if posts.iter().any(|p| p.is_none()) { return vec![] };
+                        let (parent, maybe_first_post) = (posts.remove(0).unwrap(), posts.remove(0));
+                        let r = Post::new(parent, &user, maybe_first_post, content, rights);
+                        let (parent, maybe_first_post, maybe_child) = r;
+                        vec![Some(parent), maybe_first_post, maybe_child]
+                    });
+                    Ok(Response::with((status::Ok, "OK")))
                 } else {
                     fail()
                 }
