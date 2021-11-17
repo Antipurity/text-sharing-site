@@ -30,7 +30,7 @@ use cookie::Cookie;
 
 
 
-//   TODO: UI: allow editing if allowed a post & its children.
+//   TODO: UI: allow editing (if allowed) a post & its children.
 //     (And if the "" post does not exist, allow creating it.)
 
 

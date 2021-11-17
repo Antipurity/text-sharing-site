@@ -37,6 +37,7 @@ pub enum Which {
     GetUserPostsLength, // user → length
     GetUserFirstPost, // user → post
     GetAuthorFirstPostId, // post → post_id
+    SortedByReward, // array<post> → array<post>
     IsLoggedIn, // user → bool
     Plus1, // num → num (for recursion, to increment `depth`)
     Less, // num, num → bool
@@ -219,6 +220,16 @@ impl HelperDef for PostHelper {
                 },
                 _ => json!(null),
             },
+            Which::SortedByReward => {
+                let mut vecs = arg(0).as_array().unwrap().clone();
+                vecs.sort_by_cached_key(|v| {
+                    match v.get("post_reward") {
+                        Some(r) => -r.as_i64().unwrap_or(0i64),
+                        None => 0i64,
+                    }
+                });
+                json!(vecs)
+            },
             Which::IsLoggedIn => json!(str_arg(0) != ""),
             Which::Plus1 => json!(i64_arg(0) + 1),
             Which::Less => json!(i64_arg(0) < i64_arg(1)),
@@ -267,6 +278,7 @@ impl PostHelper {
         f("GetUserPostsLength", Which::GetUserPostsLength);
         f("GetUserFirstPost", Which::GetUserFirstPost);
         f("GetAuthorFirstPostId", Which::GetAuthorFirstPostId);
+        f("SortedByReward", Which::SortedByReward);
         f("IsLoggedIn", Which::IsLoggedIn);
         f("Plus1", Which::Plus1);
         f("Less", Which::Less);
