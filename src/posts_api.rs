@@ -74,10 +74,11 @@ impl Post {
     }
     /// Adds a new child-post to a parent-post.
     /// `access_hash` must be `crate::posts_api::access_token_hash(user)`.
-    /// `user_first_post` must be `posts_store::Database::login(self, user).map(|id| database.read(vec![id]).remove(0))`.
+    /// `user_first_post` must be `posts_store::Database::login(self, user).map(|id| database.read(vec![id]).pop().unwrap())`.
     /// Returns (parent, Option<user_first_post>, Option<child>).
     pub fn new(mut parent: Post, access_hash: &str, user_first_post: Option<Post>, content: String, children_rights: CanPost) -> (Post, Option<Post>, Option<Post>) {
         // TODO: Debug some weirdness about own-post-commenting+rewarding.
+        // TODO: Why, when looking at any non-top-level post, can't we reward the post we're looking at (children are fine)?
         let rights = &parent.children_rights;
         let (same, mut user_first_post) = match user_first_post {
             Some(ref post) => if post.id == parent.id { (true, None) } else { (false, user_first_post) },
