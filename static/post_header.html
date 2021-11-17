@@ -1,38 +1,39 @@
 <div class="summary-row">
-  <div class="reward">
-    <!-- TODO: (Make the rewarding UI bearable, once we can see it, with login fully working.) -->
+  <div class="btn-group reward">
     {{#if (GetEditable post user)}}
       {{#if (lookup post "logged_in")}}
         <form action="/reward" method="post">
           <input type="hidden" name="url" value="{{url}}">
-          <input type="hidden" name="post_id" value="{{id}}">
-          <button class="btn {{#if (GetUserReward post -100)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="-100">delete</button>
+          <input type="hidden" name="post_id" value="{{post.id}}">
+          <button class="btn btn-sm little-padding {{#if (GetUserReward post -100)}}btn-outline-dark{{/if}}" name="amount" value="-100">🛇</button>
         </form>
       {{/if}}
     {{/if}}
     {{#if (lookup post "logged_in")}}
       <form action="/reward" method="post">
         <input type="hidden" name="url" value="{{url}}">
-        <input type="hidden" name="post_id" value="{{id}}">
-        <button class="btn {{#if (GetUserReward post -1)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="-1">-</button>
+        <input type="hidden" name="post_id" value="{{post.id}}">
+        <button class="btn btn-sm little-padding {{#if (GetUserReward post -1)}}btn-outline-dark{{/if}}" name="amount" value="-1">➖</button>
       </form>
     {{/if}}
     {{#if (lookup post "logged_in")}}
       <form action="/reward" method="post">
         <input type="hidden" name="url" value="{{url}}">
-        <input type="hidden" name="post_id" value="{{id}}">
-        <button class="btn {{#if (GetUserReward post 0)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="0">
+        <input type="hidden" name="post_id" value="{{post.id}}">
+        <button class="btn btn-sm little-padding" name="amount" value="0">
           {{GetPostReward post}}
         </button>
       </form>
     {{else}}
-      {{GetPostReward post}}
+      <div class="btn-sm">
+        {{GetPostReward post}}
+      </div>
     {{/if}}
     {{#if (lookup post "logged_in")}}
       <form action="/reward" method="post">
         <input type="hidden" name="url" value="{{url}}">
-        <input type="hidden" name="post_id" value="{{id}}">
-        <button class="btn {{#if (GetUserReward post 1)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="1">+</button>
+        <input type="hidden" name="post_id" value="{{post.id}}">
+        <button class="btn btn-sm little-padding {{#if (GetUserReward post 1)}}btn-outline-dark{{/if}}" name="amount" value="1">➕</button>
       </form>
     {{/if}}
   </div>

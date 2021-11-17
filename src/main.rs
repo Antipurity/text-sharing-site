@@ -30,7 +30,7 @@ use cookie::Cookie;
 
 
 
-//   TODO: UI: allow editing if allowed a post & its children, and a textfield & preview of a new post if you're allowed.
+//   TODO: UI: allow editing if allowed a post & its children.
 //     (And if the "" post does not exist, allow creating it.)
 
 
@@ -113,6 +113,7 @@ fn main() {
             };
             Header(headers::SetCookie(vec![cookie]))
         };
+        let elsewhere = status::SeeOther;
         match req.url.path()[..] {
             [""] => {
                 render(&data, &templates, "post", &user, "", 0)
@@ -124,7 +125,7 @@ fn main() {
                 if map.is_err() { return fail() };
                 let map = map.unwrap();
                 let fail = |url| { // Logout on failure.
-                    Ok(Response::with((status::Found, login_cookie(""), RedirectRaw(url))))
+                    Ok(Response::with((elsewhere, login_cookie(""), RedirectRaw(url))))
                 };
                 let url = get(map, "url");
                 match map.find(&["user"]) {
@@ -132,7 +133,7 @@ fn main() {
                         match data.login(access_token) {
                             Some(_first_post_id) => {
                                 let url = url.unwrap_or_else(|| "/".to_string());
-                                Ok(Response::with((status::Found, login_cookie(access_token), RedirectRaw(url))))
+                                Ok(Response::with((elsewhere, login_cookie(access_token), RedirectRaw(url))))
                             },
                             None => fail(url.unwrap_or_else(|| "".to_owned())),
                         }
@@ -167,9 +168,9 @@ fn main() {
                     });
                     let url = url.unwrap_or_else(|| "/".to_string());
                     if was_logged_in {
-                        Ok(Response::with((status::Found, RedirectRaw(url))))
+                        Ok(Response::with((elsewhere, RedirectRaw(url))))
                     } else {
-                        Ok(Response::with((status::Found, login_cookie(&user), RedirectRaw(url))))
+                        Ok(Response::with((elsewhere, login_cookie(&user), RedirectRaw(url))))
                     }
                 } else {
                     fail()
@@ -190,7 +191,7 @@ fn main() {
                         }
                     });
                     let url = url.unwrap_or_else(|| "/".to_string());
-                    Ok(Response::with((status::Found, RedirectRaw(url))))
+                    Ok(Response::with((elsewhere, RedirectRaw(url))))
                 } else {
                     fail()
                 }
@@ -212,7 +213,7 @@ fn main() {
                                 vec![Some(first_post), maybe_post]
                             });
                             let url = url.unwrap_or_else(|| "/".to_string());
-                            Ok(Response::with((status::Found, RedirectRaw(url))))
+                            Ok(Response::with((elsewhere, RedirectRaw(url))))
                         },
                         None => not_logged_in(),
                     }

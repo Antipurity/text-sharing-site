@@ -26,12 +26,11 @@ div.summary-row {
 
 div.reward {
     display: inline-block;
-    box-shadow: 0 0 3px black;
-    min-width: 1.5em;
     display: inline-flex;
     flex-flow: row wrap;
     align-items: center;
     justify-content: center;
+    line-height: 1;
 }
 
 div.comment-count {
@@ -52,6 +51,10 @@ details.new_child_container {
 
 .full-width {
     width: 100%;
+}
+
+.little-padding {
+    padding: 0.15em;
 }
 
 div.user_elems {
