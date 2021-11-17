@@ -21,7 +21,9 @@
       <form action="/reward" method="post">
         <input type="hidden" name="url" value="{{url}}">
         <input type="hidden" name="post_id" value="{{id}}">
-        <button class="btn {{#if (GetUserReward post 0)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="0">-</button>
+        <button class="btn {{#if (GetUserReward post 0)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="0">
+          {{GetPostReward post}}
+        </button>
       </form>
     {{else}}
       {{GetPostReward post}}

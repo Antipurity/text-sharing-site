@@ -197,8 +197,12 @@ impl HelperDef for PostHelper {
                 }
             },
             Which::GetUserFirstPost => match auth(str_arg(0)) {
-                Some(first_post) => first_post.to_json(Some(&first_post)),
-                None => json!(null),
+                Some(first_post) => {
+                    first_post.to_json(Some(&first_post))
+                },
+                None => {
+                    json!(null)
+                },
             },
             Which::IsLoggedIn => json!(str_arg(0) != ""),
             Which::Plus1 => json!(i64_arg(0) + 1),

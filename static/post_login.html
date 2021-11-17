@@ -1,17 +1,16 @@
 <div class="login-header">
   {{#if (IsLoggedIn user)}}
-    Logged in as
     {{#with (GetUserFirstPost user)}}
-      <a href="{{human_readable_url}}">{{GetSummary this}}</a>
+      <a href="{{human_readable_url}}">Logged in as {{GetSummary this}}</a>
+      |
     {{/with}}
-    |
-    <!-- TODO: Make this UI bearable. -->
     <form action="/login" method="post">
       <input type="hidden" name="user" value="">
       <button class="btn btn-outline-secondary" name="url" value="{{url}}">Logout</button>
     </form>
   {{else}}
     <!-- TODO: The option to sign up, which takes us to a known location (the post where anyone can post and thus create their account). -->
+    <!--   (But we *don't* know such a location.) -->
     <details>
       <summary>Log in</summary>
       <form action="/login" method="post">

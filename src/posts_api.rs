@@ -73,7 +73,8 @@ impl Post {
         }
     }
     /// Adds a new child-post to a parent-post.
-    /// `user_first_post` must be `posts_store::Database::login(self, access_hash).map(|id| database.read(vec![id]).remove(0))`.
+    /// `access_hash` must be `crate::posts_api::access_token_hash(user)`.
+    /// `user_first_post` must be `posts_store::Database::login(self, user).map(|id| database.read(vec![id]).remove(0))`.
     /// Returns (parent, Option<user_first_post>, Option<child>).
     pub fn new(mut parent: Post, access_hash: &str, mut user_first_post: Option<Post>, content: String, children_rights: CanPost) -> (Post, Option<Post>, Option<Post>) {
         let rights = &parent.children_rights;

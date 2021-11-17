@@ -150,6 +150,7 @@ fn main() {
                 let (parent_id, content, rights, user) = (parent_id.unwrap(), content.unwrap(), rights.unwrap(), user.unwrap());
                 if let Ok(rights) = rights.parse::<CanPost>() {
                     let maybe_first_post_id = data.login(&user);
+                    let was_logged_in = maybe_first_post_id.is_some();
                     let ids: Vec<&str> = vec![&parent_id, match maybe_first_post_id {
                         Some(ref first_post_id) => first_post_id,
                         None => "rfnerfbue4ntbweubiteruiertbnerngdoisfnoidn", // Should be non-existent.
@@ -157,13 +158,17 @@ fn main() {
                     data.update(ids, |mut posts| {
                         if posts[0].is_none() { return vec![] };
                         let (parent, maybe_first_post) = (posts.remove(0).unwrap(), posts.remove(0));
-                        let r = Post::new(parent, &user, maybe_first_post, content, rights);
+                        let token = crate::posts_api::access_token_hash(&user);
+                        let r = Post::new(parent, &token, maybe_first_post, content, rights);
                         let (parent, maybe_first_post, maybe_child) = r;
                         vec![Some(parent), maybe_first_post, maybe_child]
                     });
                     let url = url.unwrap_or_else(|| "/".to_string());
-                    // TODO: ...Is there a way to also login when creating a post for the first time...
-                    Ok(Response::with((status::Found, RedirectRaw(url))))
+                    if was_logged_in {
+                        Ok(Response::with((status::Found, RedirectRaw(url))))
+                    } else {
+                        Ok(Response::with((status::Found, login_cookie(&user), RedirectRaw(url))))
+                    }
                 } else {
                     fail()
                 }
