@@ -13,7 +13,7 @@
       <form action="/reward" method="post">
         <input type="hidden" name="url" value="{{url}}">
         <input type="hidden" name="post_id" value="{{post.id}}">
-        <button class="btn btn-sm little-padding {{#if (GetUserReward post -1)}}btn-outline-dark{{/if}}" name="amount" value="-1">➖</button>
+        <button class="btn btn-sm little-padding {{#if (GetUserReward post -1)}}btn-outline-dark{{/if}}" name="amount" value="-1">–</button>
       </form>
     {{/if}}
     {{#if (lookup post "logged_in")}}
@@ -33,7 +33,7 @@
       <form action="/reward" method="post">
         <input type="hidden" name="url" value="{{url}}">
         <input type="hidden" name="post_id" value="{{post.id}}">
-        <button class="btn btn-sm little-padding {{#if (GetUserReward post 1)}}btn-outline-dark{{/if}}" name="amount" value="1">➕</button>
+        <button class="btn btn-sm little-padding {{#if (GetUserReward post 1)}}btn-outline-dark{{/if}}" name="amount" value="1">+</button>
       </form>
     {{/if}}
   </div>
@@ -42,12 +42,11 @@
   {{else}}
     <a href="{{lookup post "human_readable_url"}}"><strong>{{GetSummary post}}</strong></a>
   {{/if}}
-  <!-- TODO: Maybe, vertically stack comments and author? -->
-  <div class="comment-count">{{post.children}} comments</div>
-  <!-- TODO: ...Shouldn't we also fetch the post's author, and its first-post, and display *its* summary, to tell who the post's by?... -->
-  By: {{post.access_hash}}<br>
-  {{#with (GetUserFirstPost (lookup post "access_hash"))}}
-  <!--   TODO: ...Wait, how do we get the post's user... .access_hash? -->
-    <a href="{{human_readable_url}}">by {{GetSummary this}}</a>
-  {{/with}}
+  <div class="extra-post-info">
+    <div>{{post.children}} comments</div>
+    {{#with (GetPostById (GetAuthorFirstPostId post) "")}}
+      <a href="{{human_readable_url}}">by {{GetSummary this}}</a>
+    {{/with}}
+  </div>
+  <div style="clear:both"></div>
 </div>

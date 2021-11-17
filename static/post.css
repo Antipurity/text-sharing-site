@@ -33,12 +33,6 @@ div.reward {
     line-height: 1;
 }
 
-div.comment-count {
-    float: right;
-    font-size: .6em;
-    line-height: 2.4em;
-}
-
 details.new_child_container {
     margin-left: 2em;
     font-size: .85em;
@@ -110,4 +104,13 @@ div.login-header {
 }
 div.login-header>* {
     margin: .5em;
+}
+
+.extra-post-info {
+    float: right;
+    font-size: .6em;
+    display: flex;
+    flex-flow: column wrap;
+    justify-content: space-evenly;
+    align-items: end;
 }

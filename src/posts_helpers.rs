@@ -35,7 +35,7 @@ pub enum Which {
     GetUserPosts, // user, page_index → array<post>
     GetUserPostsLength, // user → length
     GetUserFirstPost, // user → post
-    // TODO: GetOwnerFirstPost, maybe? (Using `data.get_first_post(post.access_hash)`.)
+    GetAuthorFirstPostId, // post → post_id
     IsLoggedIn, // user → bool
     Plus1, // num → num (for recursion, to increment `depth`)
     Less, // num, num → bool
@@ -210,6 +210,13 @@ impl HelperDef for PostHelper {
                     json!(null)
                 },
             },
+            Which::GetAuthorFirstPostId => match arg(0).get("access_hash").map(|v| v.as_str()) {
+                Some(Some(access_hash)) => {
+                    self.data.get_first_post(access_hash)
+                    .map_or_else(|| json!(null), |id: String| json!(id))
+                },
+                _ => json!(null),
+            },
             Which::IsLoggedIn => json!(str_arg(0) != ""),
             Which::Plus1 => json!(i64_arg(0) + 1),
             Which::Less => json!(i64_arg(0) < i64_arg(1)),
@@ -236,6 +243,7 @@ impl PostHelper {
         f("GetUserPosts", Which::GetUserPosts);
         f("GetUserPostsLength", Which::GetUserPostsLength);
         f("GetUserFirstPost", Which::GetUserFirstPost);
+        f("GetAuthorFirstPostId", Which::GetAuthorFirstPostId);
         f("IsLoggedIn", Which::IsLoggedIn);
         f("Plus1", Which::Plus1);
         f("Less", Which::Less);
