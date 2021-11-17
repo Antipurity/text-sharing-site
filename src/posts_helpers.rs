@@ -19,6 +19,7 @@ const PAGE_LEN: i64 = 50;
 
 pub enum Which {
     // Viewing.
+    // (All this authentication is a LOT of hashing and DB lookups per page-view. So uncivilized.)
     GetPostById, // post_id, user → post
     GetNotTopLevel, // post → bool
     GetPostReward, // post → num
@@ -39,7 +40,8 @@ pub enum Which {
     IsLoggedIn, // user → bool
     Plus1, // num → num (for recursion, to increment `depth`)
     Less, // num, num → bool
-    // (All this authentication is a LOT of hashing and DB lookups per page-view. So uncivilized.)
+    Equal, // num, num → bool
+    Pages, // current, len → array<pagination_pages>
 }
 
 
@@ -220,6 +222,27 @@ impl HelperDef for PostHelper {
             Which::IsLoggedIn => json!(str_arg(0) != ""),
             Which::Plus1 => json!(i64_arg(0) + 1),
             Which::Less => json!(i64_arg(0) < i64_arg(1)),
+            Which::Equal => json!(i64_arg(0) == i64_arg(1)),
+            Which::Pages => {
+                let (cur, len) = (i64_arg(0), i64_arg(1));
+                let mut pages: Vec<i64> = Vec::new();
+                let mut push = |p| {
+                    if p >= 0 && p < len {
+                        match pages.last() {
+                            Some(last) => if last != &p { pages.push(p) },
+                            None => pages.push(p),
+                        }
+                    }
+                };
+                push(0);
+                push(cur-2);
+                push(cur-1);
+                push(cur  );
+                push(cur+1);
+                push(cur+2);
+                push(len-1);
+                json!(pages)
+            },
         })
     }
 }
@@ -247,5 +270,7 @@ impl PostHelper {
         f("IsLoggedIn", Which::IsLoggedIn);
         f("Plus1", Which::Plus1);
         f("Less", Which::Less);
+        f("Equal", Which::Equal);
+        f("Pages", Which::Pages);
     }
 }

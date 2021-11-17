@@ -13,10 +13,13 @@
       <div class="content">{{{(GetContent post)}}}</div>
       {{#if (Less depth 1)}}
         {{> post_new_child depth=depth post=post user=user url=url}}
-        <div class="children-pagination">
-          <!-- TODO: How to do pagination? For each page, display a link to it unless it's the current page? But we'd like to only display the neighborhood and start/end... Should really have a helper, returning an array of page-indices... -->
-          {{GetPostChildrenLength post}} pages
-        </div>
+        {{#if (Less 1 (GetPostChildrenLength post))}}
+          <div class="btn-group children-pagination">
+            {{#each (Pages page (GetPostChildrenLength post))}}
+              <a href="{{../url}}/{{this}}" class="btn btn-sm {{#if (Equal this ../page)}}btn-outline-dark disabled{{else}}btn-outline-primary{{/if}}">{{Plus1 this}}</a>
+            {{/each}}
+          </div>
+        {{/if}}
         {{#each (GetPostChildren post ../user ../page)}}
           <!-- TODO: Sort children by post_reward. -->
           {{> one_post depth=(Plus1 ../depth) max_depth=../max_depth post=this user=../user page=0 url=../url}}
