@@ -98,3 +98,10 @@ details[open=""]>:not(summary) {
     0% { transform: rotate3d(1,0,0, 90deg) }
     100% { transform: rotate3d(1,0,0,0) }
 }
+
+div.login-header {
+    display: flex;
+    flex-flow: row wrap;
+    align-items: center;
+    justify-content: end;
+}

@@ -34,6 +34,7 @@ pub enum Which {
     GetUserRewardedLength, // user → length
     GetUserPosts, // user, page_index → array<post>
     GetUserPostsLength, // user → length
+    GetUserFirstPost, // user → post
     IsLoggedIn, // user → bool
     Plus1, // num → num (for recursion, to increment `depth`)
     Less, // num, num → bool
@@ -195,6 +196,10 @@ impl HelperDef for PostHelper {
                     None => json!(0),
                 }
             },
+            Which::GetUserFirstPost => match auth(str_arg(0)) {
+                Some(first_post) => first_post.to_json(Some(&first_post)),
+                None => json!(null),
+            },
             Which::IsLoggedIn => json!(str_arg(0) != ""),
             Which::Plus1 => json!(i64_arg(0) + 1),
             Which::Less => json!(i64_arg(0) < i64_arg(1)),
@@ -220,6 +225,7 @@ impl PostHelper {
         f("GetUserRewardedLength", Which::GetUserRewardedLength);
         f("GetUserPosts", Which::GetUserPosts);
         f("GetUserPostsLength", Which::GetUserPostsLength);
+        f("GetUserFirstPost", Which::GetUserFirstPost);
         f("IsLoggedIn", Which::IsLoggedIn);
         f("Plus1", Which::Plus1);
         f("Less", Which::Less);

@@ -104,34 +104,38 @@ fn main() {
                 response: Response::with((status::Forbidden, "Not logged in")),
             })
         };
+        let login_cookie = |user| {
+            let mut cookie = "user=".to_owned() + user + "; Secure; HttpOnly";
+            if user == "" {
+                cookie = cookie + "; expires=Thu, 01 Jan 1970 00:00:01 GMT"
+            };
+            Header(headers::SetCookie(vec![cookie]))
+        };
         match req.url.path()[..] {
             [""] => {
                 render(&templates, "post", &user, "", 0)
             },
-            ["login"] => { // user
-                let map = req.get_ref::<Params>();
+            ["login"] => { // url, user
                 // It's unclear how the `params` crate deals with too-large requests.
                 //   But what's clear is that it's not my problem.
-                let fail = || { // Logout on failure.
-                    let cookie = "user=; Secure; HttpOnly; expires=Thu, 01 Jan 1970 00:00:01 GMT".to_owned();
-                    let h = Header(headers::SetCookie(vec![cookie]));
-                    Err(IronError{
-                        error: Box::new(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "could not login")),
-                        response: Response::with((status::Forbidden, h, "Could not login")),
-                    })
+                let map = req.get_ref::<Params>();
+                if map.is_err() { return fail() };
+                let map = map.unwrap();
+                let fail = |url| { // Logout on failure.
+                    Ok(Response::with((status::Found, login_cookie(""), RedirectRaw(url))))
                 };
-                match map.map(|m| m.find(&["user"])) {
-                    Ok(Some(&Value::String(ref access_token))) => {
+                let url = get(map, "url");
+                match map.find(&["user"]) {
+                    Some(&Value::String(ref access_token)) => {
                         match data.login(access_token) {
                             Some(_first_post_id) => {
-                                let cookie = "user=".to_owned() + access_token + "; Secure; HttpOnly";
-                                let h = Header(headers::SetCookie(vec![cookie]));
-                                Ok(Response::with((status::Ok, h, "OK")))
+                                let url = url.unwrap_or_else(|| "/".to_string());
+                                Ok(Response::with((status::Found, login_cookie(access_token), RedirectRaw(url))))
                             },
-                            None => fail(),
+                            None => fail(url.unwrap_or_else(|| "".to_owned())),
                         }
                     },
-                    _ => fail(),
+                    _ => fail(url.unwrap_or_else(|| "".to_owned())),
                 }
             },
             ["new"] => { // url, parent_id, content, rights, user
@@ -158,6 +162,7 @@ fn main() {
                         vec![Some(parent), maybe_first_post, maybe_child]
                     });
                     let url = url.unwrap_or_else(|| "/".to_string());
+                    // TODO: ...Is there a way to also login when creating a post for the first time...
                     Ok(Response::with((status::Found, RedirectRaw(url))))
                 } else {
                     fail()
