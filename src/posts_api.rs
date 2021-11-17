@@ -180,7 +180,7 @@ impl Post {
     pub fn get_children_newest_first(&self, start:usize, end:usize) -> Result<Vec<String>, ()> {
         let start = std::cmp::min(start, self.children_ids.len());
         let end = std::cmp::min(end, self.children_ids.len());
-        if start >= end {
+        if start <= end {
             let iter = self.children_ids.iter().rev().skip(start).take(end-start);
             Ok(iter.map(|s| s.clone()).collect())
         } else {
@@ -193,7 +193,7 @@ impl Post {
     pub fn get_rewarded_posts(&self, start:usize, end:usize) -> Result<Vec<String>, ()> {
         let start = std::cmp::min(start, self.rewarded_posts.len());
         let end = std::cmp::min(end, self.rewarded_posts.len());
-        if start >= end {
+        if start <= end {
             let iter = self.rewarded_posts.keys().skip(start).take(end-start);
             Ok(iter.map(|s| s.clone()).collect())
         } else {
@@ -209,7 +209,7 @@ impl Post {
     pub fn get_created_posts(&self, start:usize, end:usize) -> Result<Vec<String>, ()> {
         let start = std::cmp::min(start, self.created_post_ids.len());
         let end = std::cmp::min(end, self.created_post_ids.len());
-        if start >= end {
+        if start <= end {
             let iter = self.created_post_ids.iter().rev().skip(start).take(end-start);
             Ok(iter.map(|s| s.clone()).collect())
         } else {

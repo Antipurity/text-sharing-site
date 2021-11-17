@@ -1,36 +1,38 @@
 <div class="summary-row">
   <div class="reward">
     <!-- TODO: (Make the rewarding UI bearable, once we can see it, with login fully working.) -->
-    {{#if (GetEditable post ../user)}}
-      {{#if logged_in}}
+    {{#if (GetEditable post user)}}
+      {{#if (lookup post "logged_in")}}
         <form action="/reward" method="post">
+          <input type="hidden" name="url" value="{{url}}">
           <input type="hidden" name="post_id" value="{{id}}">
           <button class="btn {{#if (GetUserReward post -100)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="-100">delete</button>
         </form>
       {{/if}}
     {{/if}}
-    {{#if logged_in}}
+    {{#if (lookup post "logged_in")}}
       <form action="/reward" method="post">
+        <input type="hidden" name="url" value="{{url}}">
         <input type="hidden" name="post_id" value="{{id}}">
         <button class="btn {{#if (GetUserReward post -1)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="-1">-</button>
       </form>
     {{/if}}
-    {{#if logged_in}}
+    {{#if (lookup post "logged_in")}}
       <form action="/reward" method="post">
+        <input type="hidden" name="url" value="{{url}}">
         <input type="hidden" name="post_id" value="{{id}}">
         <button class="btn {{#if (GetUserReward post 0)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="0">-</button>
       </form>
     {{else}}
       {{GetPostReward post}}
     {{/if}}
-    {{#if logged_in}}
+    {{#if (lookup post "logged_in")}}
       <form action="/reward" method="post">
         <input type="hidden" name="post_id" value="{{id}}">
         <button class="btn {{#if (GetUserReward post 1)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="1">+</button>
       </form>
     {{/if}}
   </div>
-  <!-- TODO: Have max_depth as a param, and pass it in. -->
   {{#if (Less depth 1)}}
     <strong>{{GetSummary post}}</strong>
   {{else}}

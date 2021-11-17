@@ -2,6 +2,7 @@
   <details class="new_child_container">
     <summary>Comment</summary>
     <form action="/new" method="post">
+      <input type="hidden" name="url" value="{{url}}">
       {{> post_user_form_elem depth=depth post=post user=user}}
       <textarea class="form-control margin" name="content" placeholder="# Title
 

@@ -21,6 +21,7 @@ use iron::headers;
 use iron::modifiers::Header;
 use iron::error::IronError;
 use iron::status;
+use iron::modifiers::RedirectRaw;
 use params::{Params, Value};
 use staticfile::Static;
 use handlebars::Handlebars;
@@ -30,8 +31,6 @@ use cookie::Cookie;
 
 
 //   TODO: UI: allow editing if allowed a post & its children, and a textfield & preview of a new post if you're allowed.
-//     (And the post's username/password, switched by a checkbox to a file input (innovative), if anyone can post and not logged in (else it would be too irksome to see it everywhere). On submit, hash it client-side.)
-//       (The login page should transmit the header `Set-Cookie: user=…`.)
 //     (And if the "" post does not exist, allow creating it.)
 
 
@@ -60,11 +59,13 @@ fn main() {
 
 
     let templates = templates;
-    let render = |templates: &Handlebars, name: &str, user: &str, post: &str, page:u64| {
+    let render = |templates: &Handlebars, name: &str, user: &str, post_id: &str, page:u64| {
         let body = templates.render(name, &json!({
             "user": user,
-            "post": post,
+            "post": post_id,
             "page": page,
+            "url": "/post/".to_owned() + post_id,
+            "max_depth": 1,
         })).unwrap();
         Ok(Response::with((mime!(Text/Html), status::Ok, body)))
     };
@@ -112,7 +113,7 @@ fn main() {
                 // It's unclear how the `params` crate deals with too-large requests.
                 //   But what's clear is that it's not my problem.
                 let fail = || { // Logout on failure.
-                    let cookie = "user=; Secure; HttpOnly".to_owned();
+                    let cookie = "user=; Secure; HttpOnly; expires=Thu, 01 Jan 1970 00:00:01 GMT".to_owned();
                     let h = Header(headers::SetCookie(vec![cookie]));
                     Err(IronError{
                         error: Box::new(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "could not login")),
@@ -133,14 +134,14 @@ fn main() {
                     _ => fail(),
                 }
             },
-            ["new"] => { // parent_id, content, rights, user
+            ["new"] => { // url, parent_id, content, rights, user
                 // This might be the longest implementation of a simple behavior I've ever seen.
                 //   And it's not even very efficient.
                 //   Rust (and static typing in particular) forces a lot of boilerplate.
                 let map = req.get_ref::<Params>();
                 if map.is_err() { return fail() };
                 let map = map.unwrap();
-                let (parent_id, content, rights, user) = (get(map, "parent_id"), get(map, "content"), get(map, "rights"), get(map, "user"));
+                let (url, parent_id, content, rights, user) = (get(map, "url"), get(map, "parent_id"), get(map, "content"), get(map, "rights"), get(map, "user"));
                 if parent_id.is_none() || content.is_none() || rights.is_none() || user.is_none() { return fail() };
                 let (parent_id, content, rights, user) = (parent_id.unwrap(), content.unwrap(), rights.unwrap(), user.unwrap());
                 if let Ok(rights) = rights.parse::<CanPost>() {
@@ -150,22 +151,23 @@ fn main() {
                         None => "rfnerfbue4ntbweubiteruiertbnerngdoisfnoidn", // Should be non-existent.
                     }];
                     data.update(ids, |mut posts| {
-                        if posts.iter().any(|p| p.is_none()) { return vec![] };
+                        if posts[0].is_none() { return vec![] };
                         let (parent, maybe_first_post) = (posts.remove(0).unwrap(), posts.remove(0));
                         let r = Post::new(parent, &user, maybe_first_post, content, rights);
                         let (parent, maybe_first_post, maybe_child) = r;
                         vec![Some(parent), maybe_first_post, maybe_child]
                     });
-                    Ok(Response::with((status::Ok, "OK")))
+                    let url = url.unwrap_or_else(|| "/".to_string());
+                    Ok(Response::with((status::Found, RedirectRaw(url))))
                 } else {
                     fail()
                 }
             },
-            ["edit"] => { // post_id, content, rights
+            ["edit"] => { // url, post_id, content, rights
                 let map = req.get_ref::<Params>();
                 if map.is_err() { return fail() };
                 let map = map.unwrap();
-                let (post_id, content, rights) = (get(map, "post_id"), get(map, "content"), get(map, "rights"));
+                let (url, post_id, content, rights) = (get(map, "url"), get(map, "post_id"), get(map, "content"), get(map, "rights"));
                 if post_id.is_none() || content.is_none() || rights.is_none() { return fail() };
                 let (post_id, content, rights) = (post_id.unwrap(), content.unwrap(), rights.unwrap());
                 if let Ok(rights) = rights.parse::<CanPost>() {
@@ -175,16 +177,17 @@ fn main() {
                             None => vec![],
                         }
                     });
-                    Ok(Response::with((status::Ok, "OK")))
+                    let url = url.unwrap_or_else(|| "/".to_string());
+                    Ok(Response::with((status::Found, RedirectRaw(url))))
                 } else {
                     fail()
                 }
             },
-            ["reward"] => { // post_id, amount
+            ["reward"] => { // url, post_id, amount
                 let map = req.get_ref::<Params>();
                 if map.is_err() { return fail() };
                 let map = map.unwrap();
-                let (post_id, amount) = (get(map, "post_id"), get(map, "amount"));
+                let (url, post_id, amount) = (get(map, "url"), get(map, "post_id"), get(map, "amount"));
                 if post_id.is_none() || amount.is_none() { return fail() };
                 let (post_id, amount) = (post_id.unwrap(), amount.unwrap());
                 if let Ok(amount) = amount.parse::<i8>() {
@@ -196,7 +199,8 @@ fn main() {
                                 let (first_post, maybe_post) = post.reward(first_post, amount);
                                 vec![Some(first_post), maybe_post]
                             });
-                            Ok(Response::with((status::Ok, "OK")))
+                            let url = url.unwrap_or_else(|| "/".to_string());
+                            Ok(Response::with((status::Found, RedirectRaw(url))))
                         },
                         None => not_logged_in(),
                     }
