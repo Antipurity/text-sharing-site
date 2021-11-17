@@ -30,6 +30,7 @@
     {{/if}}
     {{#if (lookup post "logged_in")}}
       <form action="/reward" method="post">
+        <input type="hidden" name="url" value="{{url}}">
         <input type="hidden" name="post_id" value="{{id}}">
         <button class="btn {{#if (GetUserReward post 1)}}btn-primary{{else}}btn-light{{/if}}" name="amount" value="1">+</button>
       </form>

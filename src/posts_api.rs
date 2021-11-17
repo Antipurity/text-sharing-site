@@ -76,18 +76,26 @@ impl Post {
     /// `access_hash` must be `crate::posts_api::access_token_hash(user)`.
     /// `user_first_post` must be `posts_store::Database::login(self, user).map(|id| database.read(vec![id]).remove(0))`.
     /// Returns (parent, Option<user_first_post>, Option<child>).
-    pub fn new(mut parent: Post, access_hash: &str, mut user_first_post: Option<Post>, content: String, children_rights: CanPost) -> (Post, Option<Post>, Option<Post>) {
+    pub fn new(mut parent: Post, access_hash: &str, user_first_post: Option<Post>, content: String, children_rights: CanPost) -> (Post, Option<Post>, Option<Post>) {
+        // TODO: Debug some weirdness about own-post-commenting+rewarding.
         let rights = &parent.children_rights;
+        let (same, mut user_first_post) = match user_first_post {
+            Some(ref post) => if post.id == parent.id { (true, None) } else { (false, user_first_post) },
+            None => (false, user_first_post),
+        };
         if matches!(rights, CanPost::All) || matches!(rights, CanPost::Itself) && &parent.access_hash == access_hash {
             let id = new_uuid();
             if let Some(ref mut post) = user_first_post {
-                post.created_post_ids.push(id.clone());
-            }
+                post.created_post_ids.push(id.clone())
+            };
+            if same {
+                parent.created_post_ids.push(id.clone())
+            };
             parent.children_ids.push(id.clone());
             let parent_id = parent.id.clone();
             (
                 parent,
-                user_first_post,
+                if same {None} else {user_first_post},
                 Some(Post {
                     id,
                     access_hash: access_hash.to_string(),
@@ -103,7 +111,7 @@ impl Post {
                 })
             )
         } else {
-            (parent, user_first_post, None)
+            (parent, if same {None} else {user_first_post}, None)
         }
     }
     /// Changes a post's content and its openness-to-comments status.
@@ -122,9 +130,6 @@ impl Post {
     /// Only succeeds if the user has given up to ±10 of ±1 rewards, to force normalization.
     /// Returns (user_first_post, Option<rewarded_post>).
     pub fn reward(self: Post, mut user_first_post: Post, amount: i8) -> (Post, Option<Post>) {
-        if &self.access_hash == &user_first_post.access_hash {
-            return (user_first_post, None)
-        }
         if amount != -100 && amount != -1 && amount != 0 && amount != 1 {
             return (user_first_post, None)
         };
@@ -143,13 +148,22 @@ impl Post {
             let old = map.insert(self.id.clone(), amount).unwrap_or(0i8);
             amount - old
         } else {
-            map.remove(&self.id);
-            0i8
+            match map.remove(&self.id) {
+                Some(old) => -old,
+                None => 0i8,
+            }
         };
-        return (user_first_post, Some(Post{
-            reward: self.reward + (delta as i64),
-            ..self
-        }))
+        if self.id != user_first_post.id {
+            (user_first_post, Some(Post{
+                reward: self.reward + (delta as i64),
+                ..self
+            }))
+        } else {
+            (Post{
+                reward: self.reward + (delta as i64),
+                ..user_first_post
+            }, None)
+        }
     }
 
     /// Returns `{ content, post_reward, user_reward, parent_id, children_rights, children, access_hash, human_readable_url, logged_in }` as a JSON object. (`.to_string()` will convert it to a JSON string.)

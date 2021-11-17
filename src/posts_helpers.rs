@@ -111,15 +111,20 @@ impl HelperDef for PostHelper {
             },
             Which::GetPostable => {
                 let user = access_token_hash(str_arg(1));
-                let children_rights = arg(0).get("children_rights").unwrap().as_str().unwrap();
-                json!(if children_rights == "none" {
-                    false
-                } else if children_rights == "all" {
-                    true
-                } else {
-                    let expect = arg(0).get("access_hash").unwrap().as_str().unwrap();
-                    expect == user
-                })
+                match arg(0).get("children_rights") {
+                    Some(rights) => {
+                        let rights = rights.as_str().unwrap();
+                        json!(if rights == "none" {
+                            false
+                        } else if rights == "all" {
+                            true
+                        } else {
+                            let expect = arg(0).get("access_hash").unwrap().as_str().unwrap();
+                            expect == user
+                        })
+                    },
+                    None => json!(false),
+                }
             },
             Which::GetParentId => match arg(0).get("parent_id").map(|v| v.as_str()) {
                 Some(Some(v)) => json!(v),
