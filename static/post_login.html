@@ -7,12 +7,17 @@
     |
     <!-- TODO: Make this UI bearable. -->
     <form action="/login" method="post">
-      <input type="hidden" name="url" value="{{url}}">
-      <button class="btn btn-outline-secondary" name="user" value="">Logout</button>
+      <input type="hidden" name="user" value="">
+      <button class="btn btn-outline-secondary" name="url" value="{{url}}">Logout</button>
     </form>
   {{else}}
-    LOGGED OUT
     <!-- TODO: The option to sign up, which takes us to a known location (the post where anyone can post and thus create their account). -->
-    <!-- TODO: And the option to log in, which opens the username+password UI (its JS should really be more able to handle many instances in a page). -->
+    <details>
+      <summary>Log in</summary>
+      <form action="/login" method="post">
+        {{> post_user_form_elem user=user}}
+        <button class="btn btn-primary full-width" name="url" value="{{url}}">Login</button>
+      </form>
+    </details>
   {{/if}}
 </div>
