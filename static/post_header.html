@@ -42,6 +42,12 @@
   {{else}}
     <a href="{{lookup post "human_readable_url"}}"><strong>{{GetSummary post}}</strong></a>
   {{/if}}
+  <!-- TODO: Maybe, vertically stack comments and author? -->
   <div class="comment-count">{{post.children}} comments</div>
   <!-- TODO: ...Shouldn't we also fetch the post's author, and its first-post, and display *its* summary, to tell who the post's by?... -->
+  By: {{post.access_hash}}<br>
+  {{#with (GetUserFirstPost (lookup post "access_hash"))}}
+  <!--   TODO: ...Wait, how do we get the post's user... .access_hash? -->
+    <a href="{{human_readable_url}}">by {{GetSummary this}}</a>
+  {{/with}}
 </div>

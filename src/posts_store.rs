@@ -66,11 +66,16 @@ impl Database {
         }
     }
 
-    /// Authenticates a user's access token (username+password hashed), returning the first-post ID if there is such a user registered, else `None`.
-    pub fn login(&self, user: &str) -> Option<String> {
+    /// Looks up the access hash in the database, to get the first post that was made by it.
+    /// Useful for retrieving a post's author (another post).
+    pub fn get_first_post(&self, access_hash: &str) -> Option<String> {
         let login_lock = self.access_hash_to_first_post_id.read().unwrap();
         let login = &*login_lock;
-        return login.get(&crate::posts_api::access_token_hash(user)).map(|s| s.clone())
+        return login.get(access_hash).map(|s| s.clone())
+    }
+    /// Authenticates a user's access token (username+password hashed), returning the first-post ID if there is such a user registered, else `None`.
+    pub fn login(&self, user: &str) -> Option<String> {
+        return self.get_first_post(&crate::posts_api::access_token_hash(user))
     }
     /// Converts a human-readable URL to the post ID, if present in the database.
     /// To get a post's URL, read `post.human_readable_url`: an empty string if not assigned.

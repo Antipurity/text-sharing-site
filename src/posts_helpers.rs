@@ -35,6 +35,7 @@ pub enum Which {
     GetUserPosts, // user, page_index → array<post>
     GetUserPostsLength, // user → length
     GetUserFirstPost, // user → post
+    // TODO: GetOwnerFirstPost, maybe? (Using `data.get_first_post(post.access_hash)`.)
     IsLoggedIn, // user → bool
     Plus1, // num → num (for recursion, to increment `depth`)
     Less, // num, num → bool
