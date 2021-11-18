@@ -83,11 +83,15 @@ impl HelperDef for PostHelper {
         let f = |x| Ok(Some(ScopedJson::from(x)));
         f(match &self.which {
             Which::GetPostById => {
-                let first_post = auth(str_arg(1));
-                let first_post_ref = first_post.as_ref();
-                match post(str_arg(0).to_string()) {
-                    Some(ref post) => post.to_json(first_post_ref),
-                    None => json!(null),
+                if arg(0).is_string() {
+                    let first_post = auth(str_arg(1));
+                    let first_post_ref = first_post.as_ref();
+                    match post(str_arg(0).to_string()) {
+                        Some(ref post) => post.to_json(first_post_ref),
+                        None => json!(null),
+                    }
+                } else {
+                    json!(null)
                 }
             },
             Which::GetNotTopLevel => {
@@ -222,14 +226,18 @@ impl HelperDef for PostHelper {
                 _ => json!(null),
             },
             Which::SortedByReward => {
-                let mut vecs = arg(0).as_array().unwrap().clone();
-                vecs.sort_by_cached_key(|v| {
-                    match v.get("post_reward") {
-                        Some(r) => -r.as_i64().unwrap_or(0i64),
-                        None => 0i64,
-                    }
-                });
-                json!(vecs)
+                if arg(0).is_array() {
+                    let mut vecs = arg(0).as_array().unwrap().clone();
+                    vecs.sort_by_cached_key(|v| {
+                        match v.get("post_reward") {
+                            Some(r) => -r.as_i64().unwrap_or(0i64),
+                            None => 0i64,
+                        }
+                    });
+                    json!(vecs)
+                } else {
+                    json!(null)
+                }
             },
             Which::IsLoggedIn => json!(str_arg(0) != ""),
             Which::Plus1 => json!(i64_arg(0) + 1),

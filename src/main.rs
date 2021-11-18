@@ -45,9 +45,13 @@ fn main() {
     }
 
     let data = Arc::new(posts_store::Database::new());
+    // TODO: data.read(vec![""]), and if result[0] is None, create the initial post.
     data.update(vec![""], |_: Vec<Option<Post>>| {
         println!("Creating the initial post..."); // TODO: Remove. (What's the better default post's content? An explanation of how this whole thing works?)
-        vec![Some(Post::new_public(Some("".to_string()), "# The initial post\n\nWhy hello there. This is the public post.\n\n<script>console.log('JS injection')</script>".to_string()))]
+        //   ...Actually, it may be okay to re-init the public post on each startup... Or, wouldn't it reset children each time? Yeah, have to guard it.
+        vec![Some(Post::new_public(Some("".to_string()), "# Text-sharing
+
+Why hello there. This is the public post.".to_string()))] // TODO: Explain what we're doing here.
     });
     posts_helpers::PostHelper::register(&mut templates, &data);
 

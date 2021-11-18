@@ -1,52 +1,60 @@
 <div class="summary-row">
-  <div class="btn-group reward">
-    {{#if (GetEditable post user)}}
+  {{#if post}}
+    <div class="btn-group reward">
+      {{#if (GetEditable post user)}}
+        {{#if (lookup post "logged_in")}}
+          <form action="/reward" method="post">
+            <input type="hidden" name="url" value="{{url}}">
+            <input type="hidden" name="post_id" value="{{post.id}}">
+            <button class="btn btn-sm little-padding {{#if (GetUserReward post -100)}}btn-outline-dark{{/if}}" name="amount" value="-100">🛇</button>
+          </form>
+        {{/if}}
+      {{/if}}
       {{#if (lookup post "logged_in")}}
         <form action="/reward" method="post">
           <input type="hidden" name="url" value="{{url}}">
           <input type="hidden" name="post_id" value="{{post.id}}">
-          <button class="btn btn-sm little-padding {{#if (GetUserReward post -100)}}btn-outline-dark{{/if}}" name="amount" value="-100">🛇</button>
+          <button class="btn btn-sm little-padding {{#if (GetUserReward post -1)}}btn-outline-dark{{/if}}" name="amount" value="-1"><strong>–</strong></button>
         </form>
       {{/if}}
-    {{/if}}
-    {{#if (lookup post "logged_in")}}
-      <form action="/reward" method="post">
-        <input type="hidden" name="url" value="{{url}}">
-        <input type="hidden" name="post_id" value="{{post.id}}">
-        <button class="btn btn-sm little-padding {{#if (GetUserReward post -1)}}btn-outline-dark{{/if}}" name="amount" value="-1">–</button>
-      </form>
-    {{/if}}
-    {{#if (lookup post "logged_in")}}
-      <form action="/reward" method="post">
-        <input type="hidden" name="url" value="{{url}}">
-        <input type="hidden" name="post_id" value="{{post.id}}">
-        <button class="btn btn-sm little-padding" name="amount" value="0">
-          {{GetPostReward post}}
-        </button>
-      </form>
-    {{else}}
-      <div class="btn-sm">
-        {{GetPostReward post}}
-      </div>
-    {{/if}}
-    {{#if (lookup post "logged_in")}}
-      <form action="/reward" method="post">
-        <input type="hidden" name="url" value="{{url}}">
-        <input type="hidden" name="post_id" value="{{post.id}}">
-        <button class="btn btn-sm little-padding {{#if (GetUserReward post 1)}}btn-outline-dark{{/if}}" name="amount" value="1">+</button>
-      </form>
-    {{/if}}
-  </div>
+      {{#if (lookup post "logged_in")}}
+        <form action="/reward" method="post">
+          <input type="hidden" name="url" value="{{url}}">
+          <input type="hidden" name="post_id" value="{{post.id}}">
+          <button class="btn btn-sm little-padding" name="amount" value="0">
+            <strong>{{GetPostReward post}}</strong>
+          </button>
+        </form>
+      {{else}}
+        <div class="btn-sm">
+          <strong>{{GetPostReward post}}</strong>
+        </div>
+      {{/if}}
+      {{#if (lookup post "logged_in")}}
+        <form action="/reward" method="post">
+          <input type="hidden" name="url" value="{{url}}">
+          <input type="hidden" name="post_id" value="{{post.id}}">
+          <button class="btn btn-sm little-padding {{#if (GetUserReward post 1)}}btn-outline-dark{{/if}}" name="amount" value="1"><strong>+</strong></button>
+        </form>
+      {{/if}}
+    </div>
+  {{/if}}
   {{#if (Less depth 1)}}
-    <strong>{{GetSummary post}}</strong>
+    {{#if post}}
+      <strong>{{GetSummary post}}</strong>
+    {{else}}
+      <strong>404</strong>: what you are looking for does not exist.
+    {{/if}}
   {{else}}
     <a href="{{lookup post "human_readable_url"}}"><strong>{{GetSummary post}}</strong></a>
   {{/if}}
-  <div class="extra-post-info">
-    <div>{{post.children}} comments</div>
-    {{#with (GetPostById (GetAuthorFirstPostId post) "")}}
-      <a href="{{human_readable_url}}">by {{GetSummary this}}</a>
-    {{/with}}
-  </div>
-  <div style="clear:both"></div>
+  {{#if post}}
+    <div class="extra-post-info">
+      <div>{{post.children}} comments</div>
+      {{#with (GetPostById (GetAuthorFirstPostId post) "")}}
+        <a href="{{human_readable_url}}">by {{GetSummary this}}</a>
+      {{/with}}
+    </div>
+    <div style="clear:both"></div>
+  {{/if}}
 </div>
