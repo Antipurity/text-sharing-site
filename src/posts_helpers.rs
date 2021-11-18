@@ -41,8 +41,9 @@ pub enum Which {
     IsLoggedIn, // user → bool
     Plus1, // num → num (for recursion, to increment `depth`)
     Less, // num, num → bool
-    Equal, // num, num → bool
+    Equal, // num, num → bool OR str, str → bool
     Pages, // current, len → array<pagination_pages>
+    NewUUID, // → str
 }
 
 
@@ -136,24 +137,24 @@ impl HelperDef for PostHelper {
             },
             Which::GetSummary => match arg(0).get("content").map(|v| v.as_str()) {
                 Some(Some(v)) => {
-                    match v.split_once('\n') {
-                        Some((line, _rest)) => json!(line.trim_start_matches('#').trim()),
-                        None => json!(v),
-                    }
+                    let s = match v.split_once('\n') {
+                        Some((line, _rest)) => line,
+                        None => v,
+                    };
+                    json!(s.trim_start_matches('#').trim())
                 },
                 _ => json!(""),
             },
             Which::GetContent => match arg(0).get("content").map(|v| v.as_str()) {
                 Some(Some(v)) => {
-                    match v.split_once('\n') {
-                        Some((_line, rest)) => {
-                            let parser = Parser::new(rest);
-                            let mut html_output = String::new();
-                            html::push_html(&mut html_output, parser);
-                            json!(ammonia::clean(&*html_output))
-                        },
-                        None => json!(v),
-                    }
+                    let s = match v.split_once('\n') {
+                        Some((_line, rest)) => rest,
+                        None => "",
+                    };
+                    let parser = Parser::new(s);
+                    let mut html_output = String::new();
+                    html::push_html(&mut html_output, parser);
+                    json!(ammonia::clean(&*html_output))
                 },
                 _ => json!(""),
             },
@@ -233,7 +234,13 @@ impl HelperDef for PostHelper {
             Which::IsLoggedIn => json!(str_arg(0) != ""),
             Which::Plus1 => json!(i64_arg(0) + 1),
             Which::Less => json!(i64_arg(0) < i64_arg(1)),
-            Which::Equal => json!(i64_arg(0) == i64_arg(1)),
+            Which::Equal => {
+                if arg(0).is_string() {
+                    json!(str_arg(0) == str_arg(1))
+                } else {
+                    json!(i64_arg(0) == i64_arg(1))
+                }
+            },
             Which::Pages => {
                 let (cur, len) = (i64_arg(0), i64_arg(1));
                 let mut pages: Vec<i64> = Vec::new();
@@ -254,6 +261,7 @@ impl HelperDef for PostHelper {
                 push(len-1);
                 json!(pages)
             },
+            Which::NewUUID => json!(crate::posts_api::new_uuid()),
         })
     }
 }
@@ -284,5 +292,6 @@ impl PostHelper {
         f("Less", Which::Less);
         f("Equal", Which::Equal);
         f("Pages", Which::Pages);
+        f("NewUUID", Which::NewUUID);
     }
 }

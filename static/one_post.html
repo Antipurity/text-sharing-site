@@ -4,15 +4,15 @@
       <a href="{{lookup (GetPostById (lookup post "parent_id") user) "human_readable_url"}}">↑ parent</a>
     {{/if}}
   {{/if}}
-  <details open="first-time" class="post">
+  <details open="first-time" class="post new_child_container">
     <summary>
       {{> post_header depth=depth post=post user=user url=url}}
     </summary>
     <div>
-      <!-- TODO: The collapsed prompt to edit if (GetEditable post ../user), given post_id,content,rights. -->
       <div class="content">{{{(GetContent post)}}}</div>
       {{#if (Less depth 1)}}
-        {{> post_new_child depth=depth post=post user=user url=url}}
+        {{> post_edit post=post user=user url=url}}
+        {{> post_new_child post=post user=user url=url}}
         {{#if (Less 1 (GetPostChildrenLength post))}}
           <div class="btn-group children-pagination">
             {{#each (Pages page (GetPostChildrenLength post))}}
@@ -27,5 +27,3 @@
     </div>
   </details>
 </article>
-<!-- TODO: Write down all other visual components that we want. -->
-<!--   ...Is that basically all we want, apart from user-specific stuff? ...Maybe said user-specific stuff should be in the post-viewer, detected when viewing the user's first post... -->

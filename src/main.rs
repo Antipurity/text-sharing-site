@@ -30,11 +30,6 @@ use cookie::Cookie;
 
 
 
-//   TODO: UI: allow editing (if allowed) a post & its children.
-//     (And if the "" post does not exist, allow creating it.)
-
-
-
 fn main() {
     let files = Static::new(Path::new("static"));
     // Register Handlebars templates, from the `static` directory.
@@ -51,7 +46,7 @@ fn main() {
 
     let data = Arc::new(posts_store::Database::new());
     data.update(vec![""], |_: Vec<Option<Post>>| {
-        println!("Creating the initial post..."); // TODO: Remove.
+        println!("Creating the initial post..."); // TODO: Remove. (What's the better default post's content? An explanation of how this whole thing works?)
         vec![Some(Post::new_public(Some("".to_string()), "# The initial post\n\nWhy hello there. This is the public post.\n\n<script>console.log('JS injection')</script>".to_string()))]
     });
     posts_helpers::PostHelper::register(&mut templates, &data);

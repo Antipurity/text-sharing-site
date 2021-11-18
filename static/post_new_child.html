@@ -1,5 +1,5 @@
 {{#if (GetPostable post user)}}
-  <details class="new_child_container">
+  <details class="smaller-font">
     <summary>Comment</summary>
     <form action="/new" method="post">
       <input type="hidden" name="url" value="{{url}}">
@@ -13,7 +13,7 @@ Have you ever heard about" rows="7" required></textarea>
         <option value="itself">Only the author can comment</option>
         <option value="none">No comments</option>
       </select>
-      <button class="btn btn-primary full-width" name="parent_id" value="{{lookup post "id"}}">Comment</button>
+      <button class="btn btn-primary full-width" name="parent_id" value="{{post.id}}">Comment</button>
     </form>
   </details>
 {{/if}}

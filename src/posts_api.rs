@@ -10,7 +10,7 @@ use handlebars::JsonValue;
 
 
 /// Creates a string that has practically no chance of being the same as another string.
-fn new_uuid() -> String {
+pub fn new_uuid() -> String {
     Uuid::new_v4().to_string()
 }
 

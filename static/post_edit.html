@@ -1,0 +1,18 @@
+{{#if (GetEditable post user)}}
+  <details class="smaller-font">
+    <summary>Edit</summary>
+    <form action="/edit" method="post">
+      <input type="hidden" name="url" value="{{url}}">
+      <textarea class="form-control margin" name="content" placeholder="# Title
+
+Have you ever heard about" rows="7" required>{{post.content}}</textarea>
+      <small class="form-text text-muted"><a href="https://commonmark.org/help/">Markdown</a> content: use text, images, lists etc to convey your message to the world. The first line should summarize it.</small>
+      <select class="form-control margin" name="rights">
+        <option value="all" {{#if (Equal "all" post.children_rights)}}selected{{/if}}>Open to comments</option>
+        <option value="itself" {{#if (Equal "itself" post.children_rights)}}selected{{/if}}>Only the author can comment</option>
+        <option value="none" {{#if (Equal "none" post.children_rights)}}selected{{/if}}>No comments</option>
+      </select>
+      <button class="btn btn-primary full-width" name="post_id" value="{{post.id}}">Commit</button>
+    </form>
+  </details>
+{{/if}}

@@ -3,25 +3,27 @@
   {{else}}
     <div class="user_elems margin">
       <input class="form-check-input form-check-inline switch js-controls-hash" type="checkbox">
-      <div class="switch-options">
-        <div class="switch-off">
-          <div class="row">
-            <div class="col">
-              <input u=u class="form-control js-gives-hash" type="text" id="username" placeholder="Username">
-            </div>
-            <div class="col">
-              <input p=p class="form-control js-gives-hash" type="password" id="password" placeholder="Password">
+      {{#with (NewUUID "yes")}}
+        <div class="switch-options">
+          <div class="switch-off">
+            <div class="row">
+              <div class="col">
+                <input u=u class="form-control js-gives-hash" type="text" id="username{{this}}" placeholder="Username">
+              </div>
+              <div class="col">
+                <input p=p class="form-control js-gives-hash" type="password" id="password{{this}}" placeholder="Password">
+              </div>
             </div>
           </div>
+          <div class="custom-file switch-on">
+            <input f=f class="custom-file-input js-gives-hash" style="visibility:hidden; position:absolute; pointer-events:none" type="file" id="accessFile{{this}}">
+            <label class="custom-file-label" style="font-size:1.6em" for="accessFile{{this}}">
+              <div class="btn btn-outline-secondary" type="button" tabindex="0">Browse</div>
+              <span class="js-file-label">The access file…</span>
+            </label>
+          </div>
         </div>
-        <div class="custom-file switch-on">
-          <input f=f class="custom-file-input js-gives-hash" style="visibility:hidden; position:absolute; pointer-events:none" type="file" id="accessFile">
-          <label class="custom-file-label" style="font-size:1.6em" for="accessFile">
-            <div class="btn btn-outline-secondary" type="button" tabindex="0">Browse</div>
-            The access file…
-          </label>
-        </div>
-      </div>
+      {{/with}}
     </div>
     <small class="form-text text-muted">Create an account. To confirm that it's you, this data has to be reproduced exactly on each login attempt. If possible, use a file to not strain your memory while maintaining security; don't lose it.</small>
   {{/if}}
@@ -32,6 +34,7 @@
   document.querySelectorAll('.js-hash-group').forEach(group => {
     const which = group.querySelector('.js-controls-hash')
     const output = group.querySelector('.js-receives-hash')
+    const fileLabel = group.querySelector('.js-file-label')
     let u, p, f
     group.querySelectorAll('.js-gives-hash').forEach(gives => {
       if (gives.getAttribute('u')) u = gives
@@ -46,6 +49,7 @@
         const r = new FileReader
         r.onload = evt => updateHash(evt.target.result)
         r.readAsText(f.files[0])
+        fileLabel.textContent = '[file]'
       }
     }
     function updateHash(str) {
