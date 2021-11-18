@@ -45,14 +45,34 @@ fn main() {
     }
 
     let data = Arc::new(posts_store::Database::new());
-    // TODO: data.read(vec![""]), and if result[0] is None, create the initial post.
-    data.update(vec![""], |_: Vec<Option<Post>>| {
-        println!("Creating the initial post..."); // TODO: Remove. (What's the better default post's content? An explanation of how this whole thing works?)
-        //   ...Actually, it may be okay to re-init the public post on each startup... Or, wouldn't it reset children each time? Yeah, have to guard it.
-        vec![Some(Post::new_public(Some("".to_string()), "# Text-sharing
+    if data.read(vec![""]).pop().unwrap().is_none() {
+        data.update(vec![""], |_: Vec<Option<Post>>| {
+            vec![Some(Post::new_public(Some("".to_string()), "# Text-sharing
 
-Why hello there. This is the public post.".to_string()))] // TODO: Explain what we're doing here.
-    });
+Welcome to a website for publicly sharing mostly-text pieces of info: *posts*.
+
+Say anything you want.
+
+<details>
+    <summary>How</summary>
+    <div>
+
+First, you'll need an account.
+
+An account is just another post. So, post it somewhere, entering your username+password (or your authentication file) and describing yourself.
+
+With an account, you can:
+- Edit your posts.
+- Reward other posts, to help others discern what you consider to be better. It's a cat-eats-cat world: every <code>+1</code> must be balanced by a <code>-1</code>, except for the initial <code>9</code>.
+
+That's all you need to know. Good luck.
+    </div>
+</details>
+
+---".to_string()))]
+        });
+        println!("Created the initial post.");
+    }
     posts_helpers::PostHelper::register(&mut templates, &data);
 
 

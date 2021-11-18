@@ -115,7 +115,7 @@ impl Post {
     }
     /// Changes a post's content and its openness-to-comments status.
     pub fn edit(self: Post, user: &str, content: String, children_rights: CanPost) -> Option<Post> {
-        if access_token_hash(user) == self.access_hash {
+        if access_token_hash(user) == self.access_hash && self.access_hash != "" {
             Some(Post {
                 content,
                 children_rights,
@@ -132,7 +132,7 @@ impl Post {
         if amount != -100 && amount != -1 && amount != 0 && amount != 1 {
             return (user_first_post, None)
         };
-        if amount == -100 && self.access_hash != user_first_post.access_hash {
+        if amount == -100 && (self.access_hash != user_first_post.access_hash || self.access_hash == "") {
             return (user_first_post, None)
         };
         if amount != -100 {
