@@ -10,7 +10,9 @@
   <body>
     <main>
       {{> post_login user=user url=url}}
-      {{> one_post depth=0 max_depth=max_depth post=(GetPostById post user) user=user page=page url=url}}
+      {{> post_component depth=0 max_depth=max_depth post=(GetPostById post user) user=user page=page url=url}}
     </main>
+    <!-- Fix Chrome's transition-firing-on-load bug, probably: -->
+    <script> </script>
   </body>
 </html>

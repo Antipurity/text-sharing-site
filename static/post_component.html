@@ -21,7 +21,7 @@
           </div>
         {{/if}}
         {{#each (SortedByReward (GetPostChildren post ../user ../page))}}
-          {{> one_post depth=(Plus1 ../depth) max_depth=../max_depth post=this user=../user page=0 url=../url}}
+          {{> post_component depth=(Plus1 ../depth) max_depth=../max_depth post=this user=../user page=0 url=../url}}
         {{/each}}
       {{/if}}
     </div>
