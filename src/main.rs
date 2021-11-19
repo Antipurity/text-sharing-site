@@ -48,8 +48,10 @@ fn main() {
 
     let firebase = Firebase::new("https://text-sharing-site-default-rtdb.europe-west1.firebasedatabase.app/").unwrap(); // TODO: Auth this server, *in secret* (can't just commit this secret to Git).
     let data = Arc::new(posts_store::Database::new(firebase));
-    if data.read(vec![""]).pop().unwrap().is_none() {
-        data.update(vec![""], |_: Vec<Option<Post>>| {
+    data.update(vec![""], |v: Vec<Option<Post>>| {
+        if v[0].is_none() {
+            // TODO: ...Since update reads too, shouldn't have a separate `read` (doubling the read-bandwidth), should check whether v[0].is_none().
+            println!("Creating the initial post.");
             vec![Some(Post::new_public(Some("".to_string()), "# Text-sharing
 
 Welcome to a website for publicly sharing mostly-text pieces of info: *posts*.
@@ -57,8 +59,8 @@ Welcome to a website for publicly sharing mostly-text pieces of info: *posts*.
 Say anything you want.
 
 <details>
-    <summary>How</summary>
-    <div>
+<summary>How</summary>
+<div>
 
 First, you'll need an account.
 
@@ -69,13 +71,12 @@ With an account, you can:
 - Reward other posts, to help others discern what you consider to be better. It's a cat-eats-cat world: every <code>+1</code> must be balanced by a <code>-1</code>, except for the initial <code>9</code>.
 
 That's all you need to know. Good luck.
-    </div>
+</div>
 </details>
 
 ---".to_string()))]
-        });
-        println!("Created the initial post.");
-    }
+        } else { vec![None] }
+    });
     posts_helpers::PostHelper::register(&mut templates, &data);
 
 

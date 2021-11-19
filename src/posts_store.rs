@@ -11,18 +11,15 @@ use crate::posts_api::Post;
 
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::RwLock;
-use std::collections::HashMap;
 
 use chrono::Datelike;
 use firebase_rs::Firebase;
+use serde_json::{from_str, to_string};
 
 
 
 pub struct Database {
     pub firebase: Firebase, // I guess this doesn't need our synchronization.
-    access_hash_to_first_post_id: RwLock<HashMap<String, String>>,
-    human_readable_url: RwLock<HashMap<String, String>>,
 }
 
 
@@ -32,8 +29,6 @@ impl Database {
     pub fn new(fb: Firebase) -> Database {
         Database{
             firebase: fb,
-            access_hash_to_first_post_id: RwLock::new(HashMap::new()),
-            human_readable_url: RwLock::new(HashMap::new()),
         }
     }
     /// Reads many posts from the database at once.
@@ -47,11 +42,15 @@ impl Database {
             let item = values[i].clone();
             let maybe_node = fb.at(&("posts/".to_owned() + id + "/data")).ok();
             handles.push(maybe_node.map(|node| node.get_async(move |res| {
-                let maybe_r = res.ok().map(|r| serde_json::from_str(&r.body).ok()).flatten();
+                let maybe_r = res.ok();
+                if let Some(ref r) = maybe_r {
+                    println!("{}", r.body); // TODO: We do fetch it. So it's a deserialization error. Need to remove maps.
+                }
+                let maybe_r = maybe_r.map(|r| from_str(&r.body).ok()).flatten();
                 *item.lock().unwrap() = maybe_r;
             })));
         }
-        for maybe_handle in handles { maybe_handle.map(|h| h.join()); }
+        for maybe_handle in handles { maybe_handle.map(|h| h.join().unwrap()); }
         values.drain(..).map(|mutex_ptr| {
             match Arc::try_unwrap(mutex_ptr).ok() {
                 Some(mutex) => mutex.into_inner().unwrap(),
@@ -76,37 +75,42 @@ impl Database {
                     post.human_readable_url = to_url_part(&post.content);
                 }
                 fb.at(&("access_hash/".to_owned() + &post.access_hash)).ok().map(|node| {
-                    handles.push(node.update_async(&post.id, |_| ()));
+                    let b = to_string(&post.id).ok();
+                    b.map(|body| handles.push(node.update_async(body, |_| ())));
                 });
                 fb.at(&("human_readable_url/".to_owned() + &post.human_readable_url)).ok().map(|node| {
-                    handles.push(node.update_async(&post.id, |_| ()));
+                    let b = to_string(&post.id).ok();
+                    b.map(|body| handles.push(node.update_async(body, |_| ())));
                 });
                 fb.at(&("posts/".to_owned() + &post.id + "/data")).ok().map(|node| {
-                    let b = serde_json::to_string(&post).ok();
+                    let b = to_string(&post).ok();
                     b.map(|body| handles.push(node.set_async(body, |_| ())));
                 });
             }
         }
+        for handle in handles { handle.join().unwrap(); }
     }
 
     /// Looks up the access hash in the database, to get the first post that was made by it.
     /// Useful for retrieving a post's author (another post).
     pub fn get_first_post(&self, access_hash: &str) -> Option<String> {
-        let login_lock = self.access_hash_to_first_post_id.read().unwrap(); // TODO: Read from `.firebase` instead.
-        let login = &*login_lock;
-        return login.get(access_hash).map(|s| s.clone())
+        let fb = &self.firebase;
+        fb.at(&("access_hash/".to_owned() + access_hash)).ok().map(|node| {
+            node.get().ok().map(|r| from_str(&r.body).ok()).flatten()
+        }).flatten()
     }
     /// Authenticates a user's access token (username+password hashed), returning the first-post ID if there is such a user registered, else `None`.
     pub fn login(&self, user: &str) -> Option<String> {
-        return self.get_first_post(&crate::posts_api::access_token_hash(user)) // TODO: Read from `.firebase` instead.
+        return self.get_first_post(&crate::posts_api::access_token_hash(user))
     }
     /// Converts a human-readable URL to the post ID, if present in the database.
     /// To get a post's URL, read `post.human_readable_url`: an empty string if not assigned.
     /// These URLs are auto-assigned, and will never collide with raw post IDs, nor with statically-served files (since these URLs are like `"2020_first_line_of_content"`).
     pub fn lookup_url(&self, url: &str) -> Option<String> {
-        let mut human_lock = self.human_readable_url.write().unwrap(); // TODO: Read from `.firebase` instead.
-        let human = &mut *human_lock;
-        human.get(url.clone()).map(|s| s.clone())
+        let fb = &self.firebase;
+        fb.at(&("human_readable_url/".to_owned() + url)).ok().map(|node| {
+            node.get().ok().map(|r| from_str(&r.body).ok()).flatten()
+        }).flatten()
     }
 }
 
