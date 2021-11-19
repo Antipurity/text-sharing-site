@@ -2,6 +2,8 @@
 //! This is a database-less thunk that simply stores posts in memory.
 //!   TODO: Use Firebase, not this thunk.
 //!   TODO: Collections that we want: posts; access_hash_to_first_post_id; human_readable_url.
+//!   TODO: Finish changing this file, and `posts_api` too.
+//!   TODO: Test it, and make it work.
 
 
 
@@ -19,7 +21,6 @@ use firebase_rs::Firebase;
 
 pub struct Database {
     pub firebase: Firebase, // I guess this doesn't need our synchronization.
-    posts: RwLock<HashMap<String, Post>>,
     access_hash_to_first_post_id: RwLock<HashMap<String, String>>,
     human_readable_url: RwLock<HashMap<String, String>>,
 }
@@ -31,7 +32,6 @@ impl Database {
     pub fn new(fb: Firebase) -> Database {
         Database{
             firebase: fb,
-            posts: RwLock::new(HashMap::new()),
             access_hash_to_first_post_id: RwLock::new(HashMap::new()),
             human_readable_url: RwLock::new(HashMap::new()),
         }
@@ -59,7 +59,7 @@ impl Database {
             }
         }).collect()
     }
-    /// Updates many posts in the database at once: read, process, write, as one atomic operation.
+    /// Updates many posts in the database at once: read, process, write, as one "atomic" operation.
     /// 
     /// (Well, "atomic" is a word too strong for this: it was a nice thought, but firebase-rs has never heard of atomicity, and we don't care enough to implement transactions ourselves (https://stackoverflow.com/questions/23041800/firebase-transactions-via-rest-api).)
     /// (It first reads all, then writes all, each of these being atomic.)
@@ -69,25 +69,22 @@ impl Database {
         let posts = self.read(ids);
         let posts = action(posts);
         let fb = &self.firebase;
-        let mut map_lock = self.posts.write().unwrap(); // TODO: Don't use `map`, use `.firebase`.
-        let mut login_lock = self.access_hash_to_first_post_id.write().unwrap(); // TODO: Store in `.firebase` instead.
-        let mut human_lock = self.human_readable_url.write().unwrap(); // TODO: Store in `.firebase` instead.
-        let map = &mut *map_lock; // TODO: Don't use `map`, use `.firebase`.
-        let login = &mut *login_lock; // TODO: Store in `.firebase` instead.
-        let human = &mut *human_lock; // TODO: Store in `.firebase` instead.
+        let mut handles: Vec<std::thread::JoinHandle<()>> = vec![];
         for maybe_post in posts {
             if let Some(mut post) = maybe_post {
-                let key = post.id.clone();
                 if post.human_readable_url == "" {
                     post.human_readable_url = to_url_part(&post.content);
                 }
-                if !login.contains_key(&post.access_hash) { // Update login info too.
-                    login.insert(post.access_hash.clone(), key.clone()); // TODO: Store in `.firebase` instead.
-                }
-                if !human.contains_key(&post.human_readable_url) {
-                    human.insert(post.human_readable_url.clone(), post.id.clone()); // TODO: Store in `.firebase` instead.
-                }
-                map.insert(key, post); // TODO: Don't use `map`, use `.firebase`.
+                fb.at(&("access_hash/".to_owned() + &post.access_hash)).ok().map(|node| {
+                    handles.push(node.update_async(&post.id, |_| ()));
+                });
+                fb.at(&("human_readable_url/".to_owned() + &post.human_readable_url)).ok().map(|node| {
+                    handles.push(node.update_async(&post.id, |_| ()));
+                });
+                fb.at(&("posts/".to_owned() + &post.id + "/data")).ok().map(|node| {
+                    let b = serde_json::to_string(&post).ok();
+                    b.map(|body| handles.push(node.set_async(body, |_| ())));
+                });
             }
         }
     }
