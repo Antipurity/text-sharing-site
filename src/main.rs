@@ -13,6 +13,7 @@ extern crate staticfile;
 extern crate params;
 extern crate handlebars;
 extern crate cookie;
+extern crate firebase_rs;
 
 use iron::prelude::*;
 use iron::mime::*;
@@ -27,6 +28,7 @@ use staticfile::Static;
 use handlebars::Handlebars;
 use serde_json::json;
 use cookie::Cookie;
+use firebase_rs::Firebase;
 
 
 
@@ -44,7 +46,11 @@ fn main() {
         }
     }
 
-    let data = Arc::new(posts_store::Database::new());
+    let firebase = Firebase::new("https://text-sharing-site-default-rtdb.europe-west1.firebasedatabase.app/").unwrap(); // TODO: Auth this server, *in secret* (can't just commit this secret to Git).
+    let firebase = firebase.at("test").unwrap();
+    firebase.set("[1,2,3,4]").unwrap(); // TODO:
+    println!("FB value {:?}", firebase.get()); // TODO: Remove this line and the two above.
+    let data = Arc::new(posts_store::Database::new()); // TODO: Pass in the Firebase instance, right? (Have to store it there.)
     if data.read(vec![""]).pop().unwrap().is_none() {
         data.update(vec![""], |_: Vec<Option<Post>>| {
             vec![Some(Post::new_public(Some("".to_string()), "# Text-sharing

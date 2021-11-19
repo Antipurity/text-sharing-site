@@ -1,6 +1,7 @@
 //! Stores posts.
 //! This is a database-less thunk that simply stores posts in memory.
 //!   TODO: Use Firebase, not this thunk.
+//!   TODO: Collections that we want: posts; access_hash_to_first_post_id; human_readable_url.
 
 
 
@@ -23,7 +24,7 @@ pub struct Database {
 
 impl Database {
     /// Initializes the database connection.
-    pub fn new() -> Database {
+    pub fn new() -> Database { // TODO: Accept the Firebase instance, and store it.
         Database{
             posts: RwLock::new(HashMap::new()),
             access_hash_to_first_post_id: RwLock::new(HashMap::new()),
