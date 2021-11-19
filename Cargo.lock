@@ -1546,6 +1546,7 @@ dependencies = [
  "params",
  "pulldown-cmark",
  "rand 0.8.4",
+ "serde",
  "serde_json",
  "sha2",
  "staticfile",

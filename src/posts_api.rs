@@ -6,6 +6,7 @@ pub use hashing::access_token_hash;
 use uuid::Uuid;
 use serde_json::json;
 use handlebars::JsonValue;
+use serde::{Deserialize, Serialize};
 
 
 
@@ -56,6 +57,20 @@ pub struct Post {
     //   (Only non-empty for initial access_hash posts, meaning, user accounts.)
     //   (Sum of non -100 rewards should be -10..=10, for balance.)
     created_post_ids: Vec<String>, // TODO: Don't have this.
+}
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Post2 { // TODO: Replace `Post` with this.
+    pub id: String,
+    pub access_hash: String, // Username&password are concatenated & hashed to produce this.
+    //   (No collisions this way. Especially if an access-file is used instead.)
+    //   (Gates write access: creating posts, editing and 'deleting' them, and rewarding any posts.)
+    //     (Password is copied into posts, so can't change it.)
+    pub human_readable_url: String, // A human-readable name, such as "2020_first_line".
+    pub content: String, // Intended to be Markdown, with the first line displayed as the title.
+    reward: i64, // Less than -10 should get deleted.
+    parent_id: String,
+    children_rights: CanPost,
+    rewarded_sum: i8,
 }
 
 impl Post {
@@ -244,6 +259,7 @@ impl Post {
 
 
 
+// Warning: 9000 lines of boilerplate ahead.
 impl ToString for CanPost {
     fn to_string(&self) -> String {
         match self {
@@ -262,5 +278,38 @@ impl core::str::FromStr for CanPost {
             "all" => Ok(Self::All),
             _ => Err(()),
         }
+    }
+}
+impl Serialize for CanPost {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: serde::Serializer {
+        serializer.serialize_str(match self {
+            Self::None => "none",
+            Self::Itself => "itself",
+            Self::All => "all",
+        })
+    }
+}
+struct CanPostVisitor;
+impl<'de> serde::de::Visitor<'de> for CanPostVisitor {
+    type Value = CanPost;
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "none|itself|all")
+    }
+    fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+    where E: serde::de::Error,
+    {
+        match s {
+            "none" => Ok(CanPost::None),
+            "itself" => Ok(CanPost::Itself),
+            "all" => Ok(CanPost::All),
+            _ => Err(serde::de::Error::invalid_value(serde::de::Unexpected::Str(s), &self)),
+        }
+    }
+}
+impl<'de> Deserialize<'de> for CanPost {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: serde::Deserializer<'de> {
+        deserializer.deserialize_str(CanPostVisitor)
     }
 }

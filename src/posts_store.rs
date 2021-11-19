@@ -43,6 +43,7 @@ impl Database {
         let map = self.posts.read().unwrap(); // TODO: Don't use `map`, use `.firebase`.
         ids.iter().map(|id| {
             let maybe_post = (*map).get(id.clone()); // TODO: Don't use `map`, use `.firebase`.
+            // TODO: What's the exact code?
             maybe_post.map(|post| (*post).clone())
         }).collect()
     }
