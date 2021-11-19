@@ -7,6 +7,8 @@
 
 use crate::posts_api::Post;
 
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::RwLock;
 use std::collections::HashMap;
 
@@ -36,13 +38,25 @@ impl Database {
     }
     /// Reads many posts from the database at once.
     pub fn read(&self, ids: Vec<&str>) -> Vec<Option<Post>> {
+        // `firebase_rs`'s `.get_async` API is really dumb. It's forcing Arc and Mutex on us.
         let fb = &self.firebase;
-        ids.iter().map(|id| {
-            // `.get_async(|| …)`'s API (https://docs.rs/firebase-rs/1.0.3/firebase_rs/struct.Firebase.html#method.get_async) is too dumb, so why go through hoops to use it for this simple project.
-            //   (Optimization opportunity.)
-            let node = fb.at(&("posts/".to_owned() + id + "/data")).ok();
-            let maybe_r = node.map(|node| node.get().ok()).flatten();
-            maybe_r.map(|r| serde_json::from_str(&r.body).ok()).flatten()
+        let mut values: Vec<Arc<Mutex<Option<Post>>>> = vec![];
+        let mut handles: Vec<Option<std::thread::JoinHandle<()>>> = vec![];
+        for (i, id) in ids.iter().enumerate() {
+            values.push(Arc::new(Mutex::new(None)));
+            let item = values[i].clone();
+            let maybe_node = fb.at(&("posts/".to_owned() + id + "/data")).ok();
+            handles.push(maybe_node.map(|node| node.get_async(move |res| {
+                let maybe_r = res.ok().map(|r| serde_json::from_str(&r.body).ok()).flatten();
+                *item.lock().unwrap() = maybe_r;
+            })));
+        }
+        for maybe_handle in handles { maybe_handle.map(|h| h.join()); }
+        values.drain(..).map(|mutex_ptr| {
+            match Arc::try_unwrap(mutex_ptr).ok() {
+                Some(mutex) => mutex.into_inner().unwrap(),
+                None => None,
+            }
         }).collect()
     }
     /// Updates many posts in the database at once: read, process, write, as one atomic operation.
@@ -54,6 +68,7 @@ impl Database {
     where F: FnOnce(Vec<Option<Post>>) -> Vec<Option<Post>> {
         let posts = self.read(ids);
         let posts = action(posts);
+        let fb = &self.firebase;
         let mut map_lock = self.posts.write().unwrap(); // TODO: Don't use `map`, use `.firebase`.
         let mut login_lock = self.access_hash_to_first_post_id.write().unwrap(); // TODO: Store in `.firebase` instead.
         let mut human_lock = self.human_readable_url.write().unwrap(); // TODO: Store in `.firebase` instead.
@@ -72,7 +87,7 @@ impl Database {
                 if !human.contains_key(&post.human_readable_url) {
                     human.insert(post.human_readable_url.clone(), post.id.clone()); // TODO: Store in `.firebase` instead.
                 }
-                map.insert(key, post); // TODO: Don't use `map`, use `.firebase`. (Possibly, mutate many at once.)
+                map.insert(key, post); // TODO: Don't use `map`, use `.firebase`.
             }
         }
     }
