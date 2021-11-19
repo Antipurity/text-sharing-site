@@ -39,7 +39,7 @@ pub enum CanPost {
 /// ```
 /// assert_eq!(5*5, 25)
 /// ```
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Post {
     pub id: String,
     pub access_hash: String, // Username&password are concatenated & hashed to produce this.
@@ -57,20 +57,6 @@ pub struct Post {
     //   (Only non-empty for initial access_hash posts, meaning, user accounts.)
     //   (Sum of non -100 rewards should be -10..=10, for balance.)
     created_post_ids: Vec<String>, // TODO: Don't have this.
-}
-#[derive(Clone, Serialize, Deserialize)]
-pub struct Post2 { // TODO: Replace `Post` with this.
-    pub id: String,
-    pub access_hash: String, // Username&password are concatenated & hashed to produce this.
-    //   (No collisions this way. Especially if an access-file is used instead.)
-    //   (Gates write access: creating posts, editing and 'deleting' them, and rewarding any posts.)
-    //     (Password is copied into posts, so can't change it.)
-    pub human_readable_url: String, // A human-readable name, such as "2020_first_line".
-    pub content: String, // Intended to be Markdown, with the first line displayed as the title.
-    reward: i64, // Less than -10 should get deleted.
-    parent_id: String,
-    children_rights: CanPost,
-    rewarded_sum: i8,
 }
 
 impl Post {

@@ -36,15 +36,13 @@ impl Database {
     }
     /// Reads many posts from the database at once.
     pub fn read(&self, ids: Vec<&str>) -> Vec<Option<Post>> {
-        let fb = &self.firebase; // TODO:
-        fb.at("hello").unwrap().set("15").unwrap(); // TODO: Use these calls to get data. Remove `.posts`.
-        //   ...BUT: how do we convert posts to JSON and back?
-        //     Specifically, `children_ids`, `rewarded_posts`, `created_post_ids` block our progress.
-        let map = self.posts.read().unwrap(); // TODO: Don't use `map`, use `.firebase`.
+        let fb = &self.firebase;
         ids.iter().map(|id| {
-            let maybe_post = (*map).get(id.clone()); // TODO: Don't use `map`, use `.firebase`.
-            // TODO: What's the exact code?
-            maybe_post.map(|post| (*post).clone())
+            // `.get_async(|| …)`'s API (https://docs.rs/firebase-rs/1.0.3/firebase_rs/struct.Firebase.html#method.get_async) is too dumb, so why go through hoops to use it for this simple project.
+            //   (Optimization opportunity.)
+            let node = fb.at(&("posts/".to_owned() + id + "/data")).ok();
+            let maybe_r = node.map(|node| node.get().ok()).flatten();
+            maybe_r.map(|r| serde_json::from_str(&r.body).ok()).flatten()
         }).collect()
     }
     /// Updates many posts in the database at once: read, process, write, as one atomic operation.
