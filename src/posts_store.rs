@@ -38,6 +38,8 @@ impl Database {
     pub fn read(&self, ids: Vec<&str>) -> Vec<Option<Post>> {
         let fb = &self.firebase; // TODO:
         fb.at("hello").unwrap().set("15").unwrap(); // TODO: Use these calls to get data. Remove `.posts`.
+        //   ...BUT: how do we convert posts to JSON and back?
+        //     Specifically, `children_ids`, `rewarded_posts`, `created_post_ids` block our progress.
         let map = self.posts.read().unwrap(); // TODO: Don't use `map`, use `.firebase`.
         ids.iter().map(|id| {
             let maybe_post = (*map).get(id.clone()); // TODO: Don't use `map`, use `.firebase`.
@@ -45,7 +47,10 @@ impl Database {
         }).collect()
     }
     /// Updates many posts in the database at once: read, process, write, as one atomic operation.
-    /// (Well, "atomic" is a word too strong for this: it first reads all, then writes all, each of these being atomic. Who cares about race conditions in this simple site?)
+    /// 
+    /// (Well, "atomic" is a word too strong for this: it was a nice thought, but firebase-rs has never heard of atomicity, and we don't care enough to implement transactions ourselves (https://stackoverflow.com/questions/23041800/firebase-transactions-via-rest-api).)
+    /// (It first reads all, then writes all, each of these being atomic.)
+    /// (And, `posts_api` reads/updates `children_ids`, `rewarded_posts`, `created_post_ids` directly, with no regard for atomicity.)
     pub fn update<F>(&self, ids: Vec<&str>, action: F)
     where F: FnOnce(Vec<Option<Post>>) -> Vec<Option<Post>> {
         let posts = self.read(ids);
