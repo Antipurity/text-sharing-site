@@ -119,11 +119,15 @@ impl Post {
             let id = new_uuid();
             let mut handles: Vec<JoinHandle<()>> = vec![];
             fb.at(&("created_post_ids/".to_owned() + access_hash)).ok().map(|node| {
+                // TODO: ...Oooh: we need to push a real object, not a mere string. (We're being ignored now.)
                 handles.push(node.push_async(&id, |_| ()))
             });
             fb.at(&("children_ids/".to_owned() + &parent.id)).ok().map(|node| {
+                // TODO: We need to push a real object, not a mere string. (We're being ignored now.)
                 handles.push(node.push_async(&id, |_| ()))
             });
+            // TODO: ...Also, we should really replace empty post IDs with something, like "".
+            // TODO: ...Also, we can't filter on strings. If we want filtering (as opposed to getting all children on every request), then we NEED to store posts hierarchically inside parents.
             atomic_update(fb, &("children_ids_length".to_owned() + &parent.id), 0i64, |v| v+1);
             for handle in handles { handle.join().unwrap(); }
             let parent_id = parent.id.clone();
@@ -247,15 +251,33 @@ impl Post {
         let start = std::cmp::min(start, len);
         let end = std::cmp::min(end, len);
         if start <= end {
+            // `firebase_rs` is so broken, it can't even set more than one param in one query with its methods.
+            let query = format!("?startAt={}&limitToFirst={}&orderBy={}", start, end-start, "reverse_reward"); // TODO: ...Omfg, can't even append it at the end because .json is appended... AGH
             let node = fb.at(&("children_ids/".to_owned() + &self.id)).ok();
             let response = node.map(|n| {
-                let n = n.with_params().order_by("reverse_reward");
-                let n = n.start_at(start as u32);
-                let n = n.limit_to_first((end-start) as u32);
+                // `firebase_rs` is so broken, it can't even set more than one param in one query with its methods.
+                let mut n = n.with_params();
+                // n.params.insert("startAt", format!("{}", start));
+                // n.params.insert("limitToFirst", format!("{}", end-start));
+                // n.params.insert("orderBy", "\"reverse_reward\"".to_owned());
+                // println!("  URL A {:?}", n.url); // TODO:
+                // n.set_params(); // TODO: WHAT, WHY IS EVEN THIS NOT ENOUGH
+                // println!("  URL B {:?}", n.url); // TODO:
+                // ...Should we try n.url.set_query("...")?
+                let url = Arc::get_mut(&mut n.url).unwrap();
+                url.set_query(Some(&format!("startAt={}&limitToFirst={}&orderBy={}", start, end-start, "\"reverse_reward\"")));
+                // n = n.add_param("startAt", start); // TODO: What in the absolute fuck, why is it THAT broken.
+                // n = n.add_param("limitToFirst", end-start);
+                // n = n.add_param("orderBy", "reverse_reward");
+                // let n = n.start_at(start as u32);
+                // let n = n.limit_to_first((end-start) as u32);
+                // let n = n.order_by("reverse_reward");
+                println!("  URL: {}", n.get_url().unwrap()); // TODO: Where are the other query params?! Why is only the first one applied?!
                 n.get().ok()
             }).flatten();
+            println!("  get_children_by_reward {:?}", response.as_ref()); // TODO: `orderBy must be defined when other query parameters are defined`... So, what do we order by? ...Wait, we *do* order by reverse reward, what the fuck.
             let ids = response.map(|r| from_str::<Vec<String>>(&r.body).ok()).flatten();
-            // TODO: Why does this fail?
+            // TODO: Why does this fail when there are children?
             match ids {
                 Some(ids) => Ok(ids),
                 None => Err(())
