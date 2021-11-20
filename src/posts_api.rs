@@ -6,6 +6,7 @@ pub use hashing::access_token_hash;
 use uuid::Uuid;
 use serde_json::json;
 use handlebars::JsonValue;
+use firebase_rs::Firebase;
 use serde::{Deserialize, Serialize};
 
 
@@ -79,30 +80,24 @@ impl Post {
         }
     }
     /// Adds a new child-post to a parent-post.
+    /// Also pushes to a user's created posts (no way to atomize this with firebase_rs).
     /// `access_hash` must be `crate::posts_api::access_token_hash(user)`.
-    /// `user_first_post` must be `posts_store::Database::login(self, user).map(|id| database.read(vec![id]).pop().unwrap())`.
-    /// Returns (parent, Option<user_first_post>, Option<child>).
-    pub fn new(mut parent: Post, access_hash: &str, user_first_post: Option<Post>, content: String, children_rights: CanPost) -> (Post, Option<Post>, Option<Post>) {
+    /// Returns (parent, Option<child>).
+    pub fn new(fb: &Firebase, parent: Post, access_hash: &str, content: String, children_rights: CanPost) -> (Post, Option<Post>) {
         let rights = &parent.children_rights;
-        let (same, mut user_first_post) = match user_first_post {
-            Some(ref post) => if post.id == parent.id { (true, None) } else { (false, user_first_post) },
-            None => (false, user_first_post),
-        };
         if matches!(rights, CanPost::All) || matches!(rights, CanPost::Itself) && &parent.access_hash == access_hash {
-            // TODO: Also accept `firebase`, and do `fb.at("posts_created_post_ids").unwrap().at(parent.id).unwrap().push(id).unwrap()`, except, handling errors, and possibly `.push_async(…, |_| "ignore response")`.
-            //   And at "posts_children_ids".
             let id = new_uuid();
-            if let Some(ref mut post) = user_first_post {
-                post.created_post_ids.push(id.clone())
-            };
-            if same {
-                parent.created_post_ids.push(id.clone())
-            };
-            parent.children_ids.push(id.clone());
+            let mut handles: Vec<std::thread::JoinHandle<()>> = vec![];
+            fb.at(&("created_post_ids/".to_owned() + access_hash)).ok().map(|node| {
+                handles.push(node.push_async(&id, |_| ()))
+            });
+            fb.at(&("children_ids/".to_owned() + &parent.id)).ok().map(|node| {
+                handles.push(node.push_async(&id, |_| ()))
+            });
+            for handle in handles { handle.join().unwrap(); }
             let parent_id = parent.id.clone();
             (
                 parent,
-                if same {None} else {user_first_post},
                 Some(Post {
                     id,
                     access_hash: access_hash.to_string(),
@@ -118,7 +113,7 @@ impl Post {
                 })
             )
         } else {
-            (parent, if same {None} else {user_first_post}, None)
+            (parent, None)
         }
     }
     /// Changes a post's content and its openness-to-comments status.

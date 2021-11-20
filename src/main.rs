@@ -177,17 +177,14 @@ That's all you need to know. Good luck.
                 if let Ok(rights) = rights.parse::<CanPost>() {
                     let maybe_first_post_id = data.login(&user);
                     let was_logged_in = maybe_first_post_id.is_some();
-                    let ids: Vec<&str> = vec![&parent_id, match maybe_first_post_id {
-                        Some(ref first_post_id) => first_post_id,
-                        None => "rfnerfbue4ntbweubiteruiertbnerngdoisfnoidn", // Should be non-existent.
-                    }];
+                    let ids: Vec<&str> = vec![&parent_id];
                     data.update(ids, |mut posts| {
                         if posts[0].is_none() { return vec![] };
-                        let (parent, maybe_first_post) = (posts.remove(0).unwrap(), posts.remove(0));
+                        let parent = posts.remove(0).unwrap();
                         let token = crate::posts_api::access_token_hash(&user);
-                        let r = Post::new(parent, &token, maybe_first_post, content, rights);
-                        let (parent, maybe_first_post, maybe_child) = r;
-                        vec![Some(parent), maybe_first_post, maybe_child]
+                        let r = Post::new(&data.firebase, parent, &token, content, rights);
+                        let (parent, maybe_child) = r;
+                        vec![Some(parent), maybe_child]
                     });
                     let url = url.unwrap_or_else(|| "/".to_string());
                     if was_logged_in {
