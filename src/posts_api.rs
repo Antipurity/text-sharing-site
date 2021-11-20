@@ -111,6 +111,9 @@ impl Post {
     /// `access_hash` must be `crate::posts_api::access_token_hash(user)`.
     /// Returns (parent, Option<child>).
     pub fn new(fb: &Firebase, parent: Post, access_hash: &str, content: String, children_rights: CanPost) -> (Post, Option<Post>) {
+        if content.len() > 50000 {
+            return (parent, None)
+        }
         let rights = &parent.children_rights;
         if matches!(rights, CanPost::All) || matches!(rights, CanPost::Itself) && &parent.access_hash == access_hash {
             let id = new_uuid();
