@@ -167,11 +167,11 @@ impl HelperDef for PostHelper {
                 Some(Some(v)) => match post(v.to_string()) {
                     Some(ref post) => {
                         let fb = &self.data.firebase;
-                        println!("                GetPostChildren user {:?} page {:?} length {:?}", arg(1), arg(2), arg(3));
+                        println!("                GetPostChildren user {:?} page {:?} length {:?}", arg(1), arg(2), arg(3)); // TODO:
                         let first_post = auth(str_arg(1));
                         let (start, end) = page(i64_arg(2));
                         let len = i64_arg(3);
-                        let ch = post.get_children_by_reward(fb, start, end, len as usize).unwrap(); // TODO: Why did this panic once again?
+                        let ch = post.get_children_by_reward(fb, start, end, len as usize).unwrap();
                         post_ids_to_post_json(ch, first_post)
                     },
                     None => json!(null),

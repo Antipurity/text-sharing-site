@@ -1,7 +1,7 @@
 //! Stores posts in Firebase.
-//!   TODO: Test it, and make it work.
-//!   TODO: Debug why a post's comments are not looked up properly anymore.
-//!     (Also, maybe, look them up async too.)
+//!   TODO: Test it fully, and make it work fully.
+//!   TODO: Maybe, try to look up a post's comment-count async too, in `.to_json`.
+//!     (...Also, why doesn't it work now/still.)
 
 
 
@@ -17,8 +17,37 @@ use serde_json::{from_str, to_string};
 
 
 
+/// Persistence.
+/// 
+/// Determination.
+/// 
+/// Resolve.
+/// 
+/// Endurance.
+/// 
+/// Of data.
 pub struct Database {
-    pub firebase: Firebase, // I guess this doesn't need our synchronization.
+    pub firebase: Firebase, // This doesn't need our synchronization.
+}
+
+
+
+/// Concatenates parts of a Firebase API URL properly.
+/// 
+/// (Why: for example, "" parts don't create entries, so the tree would become messed up without special handling as in here.)
+/// 
+/// ```
+/// assert_eq!(&fb_path(&["a", "", "c"]), "a/_/c");
+/// ```
+pub fn fb_path(a: &[&str]) -> String {
+    let mut first = true;
+    a.iter().fold(String::new(), |mut a, b| {
+        a.reserve((if b.is_empty() {1} else {b.len()}) + (if first {0} else {1}));
+        if !first { a.push_str("/") };
+        first = false;
+        a.push_str(if b.is_empty() {"_"} else {b});
+        a
+    })
 }
 
 
@@ -51,7 +80,7 @@ impl Database {
         for (i, id) in ids.iter().enumerate() {
             values.push(Arc::new(Mutex::new(None)));
             let item = values[i].clone();
-            let maybe_node = fb.at(&("posts/".to_owned() + id + "/data")).ok();
+            let maybe_node = fb.at(&fb_path(&["posts", id])).ok();
             handles.push(maybe_node.map(|node| node.get_async(move |res| {
                 let maybe_r = res.ok();
                 if let Some(ref r) = maybe_r {
@@ -86,21 +115,20 @@ impl Database {
                     post.human_readable_url = to_url_part(&post.content);
                 }
                 if post.access_hash != "" {
-                    fb.at(&("access_hash/".to_owned() + &post.access_hash)).ok().map(|node| {
+                    fb.at(&fb_path(&["access_hash", &post.access_hash])).ok().map(|node| {
                         let b = to_string(&UserFirstPost{
                             first_post_id: post.id.clone(),
                         }).ok();
                         b.map(|body| handles.push(node.update_async(body, |_| ())));
                     });
                 }
-                fb.at(&("human_readable_url/".to_owned() + &post.human_readable_url)).ok().map(|node| {
+                fb.at(&fb_path(&["human_readable_url", &post.human_readable_url])).ok().map(|node| {
                     let b = to_string(&Shortened {
                         post_id: post.id.clone(),
                     }).ok();
                     b.map(|body| handles.push(node.update_async(body, |_| ())));
                 });
-                fb.at(&("posts/".to_owned() + &post.id + "/data")).ok().map(|node| {
-                    // This `/data` at the end prevents the id="" post from reading all posts in existence when retrieved.
+                fb.at(&fb_path(&["posts", &post.id])).ok().map(|node| {
                     let b = to_string(&post).ok();
                     b.map(|body| handles.push(node.set_async(body, |_| ())));
                 });
@@ -114,7 +142,7 @@ impl Database {
     pub fn get_first_post(&self, access_hash: &str) -> Option<String> {
         if access_hash == "" { return None }
         let fb = &self.firebase;
-        fb.at(&("access_hash/".to_owned() + access_hash)).ok().map(|node| {
+        fb.at(&fb_path(&["access_hash", access_hash])).ok().map(|node| {
             node.get().ok().map(|r| from_str::<UserFirstPost>(&r.body).ok().map(|u| u.first_post_id)).flatten()
         }).flatten()
     }
@@ -127,7 +155,7 @@ impl Database {
     /// These URLs are auto-assigned, and will never collide with raw post IDs, nor with statically-served files (since these URLs are like `"2020_first_line_of_content"`).
     pub fn lookup_url(&self, url: &str) -> Option<String> {
         let fb = &self.firebase;
-        fb.at(&("human_readable_url/".to_owned() + url)).ok().map(|node| {
+        fb.at(&fb_path(&["human_readable_url", url])).ok().map(|node| {
             node.get().ok().map(|r| from_str::<Shortened>(&r.body).ok().map(|s| s.post_id)).flatten()
         }).flatten()
     }
