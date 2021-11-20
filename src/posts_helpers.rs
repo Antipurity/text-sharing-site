@@ -8,7 +8,7 @@ use crate::posts_store::Database;
 use crate::posts_api::access_token_hash;
 use crate::posts_api::Post;
 
-use handlebars::{HelperDef, Helper, Handlebars, Context, RenderContext, ScopedJson, RenderError};
+use handlebars::{HelperDef, Helper, Handlebars, Context, RenderContext, ScopedJson, RenderError, JsonValue};
 use serde_json::json;
 use pulldown_cmark::{Parser, html};
 
@@ -70,13 +70,16 @@ impl HelperDef for PostHelper {
             (start, start + PAGE_LEN as usize)
         };
         let post_ids_to_post_json = |ids: Vec<String>, first_post: Option<crate::posts_api::Post>| {
-            let posts = self.data.read(ids.iter().map(|s| &s[..]).collect());
-            json!(posts.iter().map(|maybe_post| match maybe_post {
-                Some(post) => post.to_json_sync(&self.data.firebase, first_post.as_ref()),
-                // TODO: ...Can we parallelize the getting of this, because 50 requests to the DB just to get the user reward is way too slow to execute in serial...
-                //   (If .to_json returns an Err, call it later, else it's available now.)
-                None => json!(null),
-            }).collect::<handlebars::JsonValue>())
+            // Collect user-data rewards in parallel.
+            let mut posts = self.data.read(ids.iter().map(|s| &s[..]).collect());
+            let mut perhaps_promises = posts.drain(..).map(|maybe_post| match maybe_post {
+                Some(post) => post.to_json(&self.data.firebase, first_post.as_ref()),
+                None => Ok(json!(null)),
+            }).collect::<Vec<Result<JsonValue, Box<dyn FnOnce()->JsonValue>>>>();
+            json!(perhaps_promises.drain(..).map(|p| match p {
+                Ok(v) => v,
+                Err(closure) => closure(),
+            }).collect::<JsonValue>())
         };
         let f = |x| Ok(Some(ScopedJson::from(x)));
         f(match &self.which {
