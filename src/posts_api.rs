@@ -8,6 +8,7 @@ use serde_json::json;
 use handlebars::JsonValue;
 use firebase_rs::Firebase;
 use serde::{Deserialize, Serialize};
+use serde_json::{from_str, to_string};
 
 
 
@@ -28,8 +29,35 @@ pub enum CanPost {
 
 
 
-// TODO: A function for atomically updating a Firebase counter (read, then as long as write (update(response)) fails, repeat read+write).
-//   (Each counter has to have an entry in the DB, checking that each update makes sense.)
+/// Returns how many seconds have passed since the Unix Epoch (1970-01-01 00:00:00 UTC).
+fn timestamp() -> i64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64
+}
+
+
+
+/// Atomic counters? In Firebase? Too modern for firebase_rs (and probably the REST API).
+/// Manually-implemented transactions? *Perfection*.
+/// Each counter has to have a rule in the DB which checks that the update is possible.
+fn atomic_update<F>(fb: &Firebase, at: &str, default: i64, update: F)
+where F: Fn(i64) -> i64 {
+    // Until the write succeeds: read, then write updated value.
+    let maybe_node = fb.at(at).ok();
+    maybe_node.map(|node| {
+        loop {
+            let v = node.get().ok().map(|r| from_str::<i64>(&r.body).ok()).flatten().unwrap_or(default);
+            let v = update(v);
+            let body = to_string(&v).ok();
+            match body {
+                Some(string) => {
+                    let r = node.set(&string);
+                    if r.is_ok() && r.unwrap().code / 100 == 2 { break };
+                },
+                None => break,
+            }
+        }
+    });
+}
 
 
 
@@ -58,6 +86,7 @@ pub struct Post {
     //   (Only non-empty for initial access_hash posts, meaning, user accounts.)
     //   (Sum of non -100 rewards should be -10..=10, for balance.)
     created_post_ids: Vec<String>, // TODO: Don't have this.
+    reverse_date_created: i64,
 }
 
 impl Post {
@@ -77,6 +106,7 @@ impl Post {
             rewarded_sum: 0i8,
             rewarded_posts: HashMap::new(), // TODO: Don't do this.
             created_post_ids: Vec::new(), // TODO: Don't do this.
+            reverse_date_created: -timestamp(),
         }
     }
     /// Adds a new child-post to a parent-post.
@@ -110,6 +140,7 @@ impl Post {
                     rewarded_sum: 0i8,
                     rewarded_posts: HashMap::new(), // TODO: Don't do this.
                     created_post_ids: Vec::new(), // TODO: Don't do this.
+                    reverse_date_created: -timestamp(),
                 })
             )
         } else {
@@ -131,7 +162,8 @@ impl Post {
     /// Gives reward to a post, from a user: -100|-1|1.
     /// Only succeeds if the user has given up to ±10 of ±1 rewards, to force normalization.
     /// Returns (user_first_post, Option<rewarded_post>).
-    pub fn reward(self: Post, mut user_first_post: Post, amount: i8) -> (Post, Option<Post>) {
+    pub fn reward(self: Post, fb: &Firebase, mut user_first_post: Post, amount: i8) -> (Post, Option<Post>) {
+        // TODO: Also accept an instance of Firebase.
         if amount != -100 && amount != -1 && amount != 0 && amount != 1 {
             return (user_first_post, None)
         };
@@ -145,7 +177,9 @@ impl Post {
             }
             user_first_post.rewarded_sum += amount;
         };
-        let map = &mut user_first_post.rewarded_posts; // TODO: Update a Firebase per-user counter, not a HashMap.
+        let map = &mut user_first_post.rewarded_posts;
+        //   TODO: ...Wait a second, aren't we updating 2 counters at once here: the user/post (to be exactly what we specified) and the post (adding the difference in user/post)...
+        //     Well, the second one can be atomically updated, I guess.
         let delta = if amount != 0 {
             let old = map.insert(self.id.clone(), amount).unwrap_or(0i8); // TODO: Firebase.
             amount - old
@@ -157,12 +191,12 @@ impl Post {
         };
         if self.id != user_first_post.id {
             (user_first_post, Some(Post{
-                reward: self.reward + (delta as i64),
+                reward: self.reward + (delta as i64), // TODO: ...Wait, if reward is on-post, then its update can't be atomic, which could be bad in high-contention situations...
                 ..self
             }))
         } else {
             (Post{
-                reward: self.reward + (delta as i64),
+                reward: self.reward + (delta as i64), // TODO: Update a Firebase per-user counter, not a post: `atomic_update(fb, "post_reward/" + self.id, )`.
                 ..user_first_post
             }, None)
         }
@@ -182,6 +216,7 @@ impl Post {
             "parent_id": self.parent_id,
             "children_rights": self.children_rights.to_string(),
             "children": self.children_ids.len(), // TODO: Read this from Firebase. (In fact, may have to store the array length separately, because Firebase for SOME reason doesn't support querying array length.)
+            //   ...Or maybe make users (just the `GetPostChildrenLength` helper) query this separately...
             "access_hash": self.access_hash,
             "human_readable_url": "/post/".to_owned() + if &self.human_readable_url == "" {
                 &self.id
@@ -198,7 +233,7 @@ impl Post {
         let start = std::cmp::min(start, self.children_ids.len()); // TODO: Read this from Firebase.
         let end = std::cmp::min(end, self.children_ids.len());
         if start <= end {
-            let iter = self.children_ids.iter().rev().skip(start).take(end-start); // TODO: Read from Firebase, via `.at("posts_children_ids").unwrap().with_params().start_at(start).limit_to_first(end-start).get().unwrap()` but with error-handling. (Maybe Post should have the date, so that we can `.order_by("reverse_date_created").`)
+            let iter = self.children_ids.iter().rev().skip(start).take(end-start); // TODO: Read from Firebase, via `.at(&("children_ids/".to_owned() + &self.id)).unwrap().with_params().start_at(start).limit_to_first(end-start).get().unwrap()` but with error-handling. (Maybe Post should have the date, so that we can `.order_by("reverse_date_created").`)
             Ok(iter.map(|s| s.clone()).collect())
         } else {
             Err(())

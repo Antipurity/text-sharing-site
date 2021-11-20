@@ -229,7 +229,7 @@ That's all you need to know. Good luck.
                             data.update(vec![&post_id, &first_post_id], |mut posts| {
                                 if posts.iter().any(|p| p.is_none()) { return vec![] };
                                 let (post, first_post) = (posts.remove(0).unwrap(), posts.remove(0).unwrap());
-                                let (first_post, maybe_post) = post.reward(first_post, amount);
+                                let (first_post, maybe_post) = post.reward(&data.firebase, first_post, amount);
                                 vec![Some(first_post), maybe_post]
                             });
                             let url = url.unwrap_or_else(|| "/".to_string());
