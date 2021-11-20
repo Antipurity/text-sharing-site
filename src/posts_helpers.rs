@@ -13,7 +13,7 @@ use pulldown_cmark::{Parser, html};
 
 
 
-const PAGE_LEN: i64 = 50;
+const PAGE_LEN: i64 = 32;
 
 
 
@@ -103,13 +103,13 @@ impl HelperDef for PostHelper {
                     None => json!(false),
                 }
             },
-            Which::GetPostReward => match arg(0).get("post_reward") {
+            Which::GetPostReward => match arg(0).get("post_reward") { // TODO: Query Firebase's post_reward/POST_ID.
                 Some(v) => json!(v.as_i64().unwrap()),
                 None => json!(0i64),
             },
             Which::GetUserReward => {
                 let expect = arg(1).as_i64().unwrap();
-                match arg(0).get("user_reward") {
+                match arg(0).get("user_reward") { // TODO: Read from Firebase's user_reward/ACCESS_TOKEN/POST_ID.
                     Some(v) => json!(v.as_i64().unwrap() == expect),
                     None => json!(0i64 == expect),
                 }
@@ -165,16 +165,17 @@ impl HelperDef for PostHelper {
             Which::GetPostChildren => match arg(0).get("id").map(|v| v.as_str()) {
                 Some(Some(v)) => match post(v.to_string()) {
                     Some(ref post) => {
+                        let fb = &self.data.firebase;
                         let first_post = auth(str_arg(1));
-                        let (start, end) = page(i64_arg(2));
-                        let ch = post.get_children_newest_first(start, end).unwrap();
+                        let (start, end) = page(i64_arg(2)); // TODO: Also accept the length from `GetPostChildrenLength`, and pass it to `get_children_newest_first`.
+                        let ch = post.get_children_newest_first(fb, start, end, 0usize).unwrap();
                         post_ids_to_post_json(ch, first_post)
                     },
                     None => json!(null),
                 },
                 _ => json!(null),
             },
-            Which::GetPostChildrenLength => match arg(0).get("children").map(|v| v.as_i64()) {
+            Which::GetPostChildrenLength => match arg(0).get("children").map(|v| v.as_i64()) { // TODO: Don't read this prop, instead `crate::posts_api::Post::get_children_length(&self.data.firebase, id)`
                 Some(Some(v)) => json!(1 + (v-1) / PAGE_LEN), // Always at least 1.
                 _ => json!(0i64),
             },
@@ -226,6 +227,7 @@ impl HelperDef for PostHelper {
                 _ => json!(null),
             },
             Which::SortedByReward => {
+                // TODO: Maybe, query Firebase instead.
                 if arg(0).is_array() {
                     let mut vecs = arg(0).as_array().unwrap().clone();
                     vecs.sort_by_cached_key(|v| {

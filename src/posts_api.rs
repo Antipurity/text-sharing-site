@@ -39,15 +39,16 @@ fn timestamp() -> i64 {
 /// Atomic counters? In Firebase? Too modern for firebase_rs (and probably the REST API).
 /// Manually-implemented transactions? *Perfection*.
 /// Each counter has to have a rule in the DB which checks that the update is possible.
-fn atomic_update<F>(fb: &Firebase, at: &str, default: i64, update: F)
-where F: Fn(i64) -> i64 {
+fn atomic_update<F>(fb: &Firebase, at: &str, default: i64, mut update: F)
+where F: FnMut(i64) -> i64 {
     // Until the write succeeds: read, then write updated value.
     let maybe_node = fb.at(at).ok();
     maybe_node.map(|node| {
         loop {
-            let v = node.get().ok().map(|r| from_str::<i64>(&r.body).ok()).flatten().unwrap_or(default);
-            let v = update(v);
-            let body = to_string(&v).ok();
+            let old = node.get().ok().map(|r| from_str::<i64>(&r.body).ok()).flatten().unwrap_or(default);
+            let new = update(old);
+            if new == old { break };
+            let body = to_string(&new).ok();
             match body {
                 Some(string) => {
                     let r = node.set(&string);
@@ -77,7 +78,7 @@ pub struct Post {
     //     (Password is copied into posts, so can't change it.)
     pub human_readable_url: String, // A human-readable name, such as "2020_first_line".
     pub content: String, // Intended to be Markdown, with the first line displayed as the title.
-    reward: i64, // Less than -10 should get deleted.
+    reward: i64,
     parent_id: String,
     children_rights: CanPost,
     children_ids: Vec<String>, // TODO: Don't have this.
@@ -124,6 +125,7 @@ impl Post {
             fb.at(&("children_ids/".to_owned() + &parent.id)).ok().map(|node| {
                 handles.push(node.push_async(&id, |_| ()))
             });
+            atomic_update(fb, &("children_ids_length".to_owned() + &parent.id), 0i64, |v| v+1);
             for handle in handles { handle.join().unwrap(); }
             let parent_id = parent.id.clone();
             (
@@ -159,11 +161,11 @@ impl Post {
             None
         }
     }
-    /// Gives reward to a post, from a user: -100|-1|1.
+    /// Gives reward to a post, from a user: -100|-1|0|1.
     /// Only succeeds if the user has given up to ±10 of ±1 rewards, to force normalization.
-    /// Returns (user_first_post, Option<rewarded_post>).
+    /// Returns (user_first_post, Option<rewarded_post>), and has some side-effects.
+    /// Disgustingly non-atomic.
     pub fn reward(self: Post, fb: &Firebase, mut user_first_post: Post, amount: i8) -> (Post, Option<Post>) {
-        // TODO: Also accept an instance of Firebase.
         if amount != -100 && amount != -1 && amount != 0 && amount != 1 {
             return (user_first_post, None)
         };
@@ -177,46 +179,36 @@ impl Post {
             }
             user_first_post.rewarded_sum += amount;
         };
-        let map = &mut user_first_post.rewarded_posts;
-        //   TODO: ...Wait a second, aren't we updating 2 counters at once here: the user/post (to be exactly what we specified) and the post (adding the difference in user/post)...
-        //     Well, the second one can be atomically updated, I guess.
-        let delta = if amount != 0 {
-            let old = map.insert(self.id.clone(), amount).unwrap_or(0i8); // TODO: Firebase.
-            amount - old
-        } else {
-            match map.remove(&self.id) { // TODO: Firebase.
-                Some(old) => -old,
-                None => 0i8,
-            }
-        };
+        let at = "user_reward/".to_owned() + &user_first_post.id + "/" + &self.id;
+        let old = fb.at(&at).ok().map(|n| n.get().ok()).flatten().map(|r| from_str::<i8>(&r.body).ok()).flatten().unwrap_or(0i8);
+        to_string::<i8>(&amount).ok().map(|string| fb.at(&at).ok().map(|n| n.update(&string).ok()));
+        let delta = amount - old;
         if self.id != user_first_post.id {
             (user_first_post, Some(Post{
-                reward: self.reward + (delta as i64), // TODO: ...Wait, if reward is on-post, then its update can't be atomic, which could be bad in high-contention situations...
+                reward: self.reward + (delta as i64),
                 ..self
             }))
         } else {
             (Post{
-                reward: self.reward + (delta as i64), // TODO: Update a Firebase per-user counter, not a post: `atomic_update(fb, "post_reward/" + self.id, )`.
+                reward: self.reward + (delta as i64),
                 ..user_first_post
             }, None)
         }
     }
 
-    /// Returns `{ content, post_reward, user_reward, parent_id, children_rights, children, access_hash, human_readable_url, logged_in }` as a JSON object. (`.to_string()` will convert it to a JSON string.)
-    /// `content` and `parent_id` and `human_readable_url` are strings, rewards are integers, `children_rights` is 'none'|'itself'|'all', `children` is how many children this post has, `access_hash` is what the owner's access token must hash to, `logged_in` is a boolean.
+    /// Returns `{ content, post_reward, user_reward, parent_id, children_rights, access_hash, human_readable_url, logged_in }` as a JSON object. (`.to_string()` will convert it to a JSON string.)
+    /// `content` and `parent_id` and `human_readable_url` are strings, rewards are integers, `children_rights` is 'none'|'itself'|'all', `access_hash` is what the owner's access token must hash to, `logged_in` is a boolean.
     pub fn to_json(self: &Post, user: Option<&Post>) -> JsonValue {
         json!({
             "id": self.id,
             "content": self.content,
             "post_reward": self.reward,
             "user_reward": match user {
-                Some(u) => u.rewarded_posts.get(&self.id).map_or(0i8, |r| *r), // TODO: Read from Firebase.
+                Some(u) => u.rewarded_posts.get(&self.id).map_or(0i8, |r| *r), // TODO: Read from Firebase, at users: user_reward/FIRST_POST_ID/POST_ID.
                 None => 0i8,
             },
             "parent_id": self.parent_id,
             "children_rights": self.children_rights.to_string(),
-            "children": self.children_ids.len(), // TODO: Read this from Firebase. (In fact, may have to store the array length separately, because Firebase for SOME reason doesn't support querying array length.)
-            //   ...Or maybe make users (just the `GetPostChildrenLength` helper) query this separately...
             "access_hash": self.access_hash,
             "human_readable_url": "/post/".to_owned() + if &self.human_readable_url == "" {
                 &self.id
@@ -229,22 +221,28 @@ impl Post {
 
     /// Gets the specified child-post IDs of a post, most-recent first.
     /// (Currently not optimized, because there's no need.)
-    pub fn get_children_newest_first(&self, start:usize, end:usize) -> Result<Vec<String>, ()> {
-        let start = std::cmp::min(start, self.children_ids.len()); // TODO: Read this from Firebase.
-        let end = std::cmp::min(end, self.children_ids.len());
+    pub fn get_children_newest_first(&self, fb: &Firebase, start:usize, end:usize, len:usize) -> Result<Vec<String>, ()> {
+        let start = std::cmp::min(start, len);
+        let end = std::cmp::min(end, len);
         if start <= end {
-            let iter = self.children_ids.iter().rev().skip(start).take(end-start); // TODO: Read from Firebase, via `.at(&("children_ids/".to_owned() + &self.id)).unwrap().with_params().start_at(start).limit_to_first(end-start).get().unwrap()` but with error-handling. (Maybe Post should have the date, so that we can `.order_by("reverse_date_created").`)
+            let iter = self.children_ids.iter().rev().skip(start).take(end-start); // TODO: Read from Firebase, via `fb.at(&("children_ids/".to_owned() + &self.id)).unwrap().with_params().start_at(start).limit_to_first(end-start).get().unwrap()` but with error-handling. (Maybe Post should have the date, so that we can `.order_by("reverse_date_created").`)
             Ok(iter.map(|s| s.clone()).collect())
         } else {
             Err(())
         }
     }
+    pub fn get_children_length(post_id: &str, fb: &Firebase) -> u64 {
+        // TODO: `fb.at(&("children_ids_length/".to_owned() + &self.id))`, but also parse and handle errors.
+        0
+    }
 
+    // TODO: ...Do we even want the funcs (and so helpers) below...
     /// Gets the specified rewarded-post IDs of a user's first post, in an arbitrary order.
     /// (Currently not optimized, because there's no need.)
     pub fn get_rewarded_posts(&self, start:usize, end:usize) -> Result<Vec<String>, ()> {
-        let start = std::cmp::min(start, self.rewarded_posts.len()); // TODO: Read from Firebase.
-        let end = std::cmp::min(end, self.rewarded_posts.len());
+        let len = self.rewarded_posts.len(); // TODO: Read from Firebase.
+        let start = std::cmp::min(start, len);
+        let end = std::cmp::min(end, len);
         if start <= end {
             let iter = self.rewarded_posts.keys().skip(start).take(end-start); // TODO: Read from Firebase, via `.at("posts_rewarded_posts").unwrap().with_params().start_at(start).limit_to_first(end-start).get().unwrap()` but with error-handling.
             Ok(iter.map(|s| s.clone()).collect())
