@@ -21,8 +21,8 @@
               {{/each}}
             </div>
           {{/if}}
-          {{#each (GetPostChildren ../post ../../user ../../page this)}}
-            {{> post_component depth=(Plus1 ../../depth) max_depth=../../max_depth post=../this user=../../user page=0 url=../../url}}
+          {{#each (GetPostChildren ../post ../user ../page this)}}
+            {{> post_component depth=(Plus1 ../../depth) max_depth=../../max_depth post=../this user=../../user page=0 url=../../url children_length=this}}
           {{/each}}
         {{/with}}
       {{/if}}

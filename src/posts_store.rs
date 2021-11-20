@@ -1,9 +1,7 @@
-//! Stores posts.
-//! This is a database-less thunk that simply stores posts in memory.
-//!   TODO: Use Firebase, not this thunk.
-//!   TODO: Collections that we want: posts; access_hash_to_first_post_id; human_readable_url.
-//!   TODO: Finish changing this file, and `posts_api` too.
+//! Stores posts in Firebase.
 //!   TODO: Test it, and make it work.
+//!   TODO: Debug why a post's comments are not looked up properly anymore.
+//!     (Also, maybe, look them up async too.)
 
 
 
@@ -14,12 +12,25 @@ use std::sync::Mutex;
 
 use chrono::Datelike;
 use firebase_rs::Firebase;
+use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
 
 
 
 pub struct Database {
     pub firebase: Firebase, // I guess this doesn't need our synchronization.
+}
+
+
+
+/// This exists because Firebase only wants to store objects at its nodes, for some reason.
+#[derive(Clone, Serialize, Deserialize)]
+struct UserFirstPost {
+    first_post_id: String,
+}
+#[derive(Clone, Serialize, Deserialize)]
+struct Shortened {
+    post_id: String,
 }
 
 
@@ -44,7 +55,7 @@ impl Database {
             handles.push(maybe_node.map(|node| node.get_async(move |res| {
                 let maybe_r = res.ok();
                 if let Some(ref r) = maybe_r {
-                    println!("{}", r.body); // TODO: We do fetch it. So it's a deserialization error. Need to remove maps.
+                    println!("    {}", r.body); // TODO: Reading works now, so, remove this print. (Or maybe, debug why a simple post-view involves 3 reads of the post.)
                 }
                 let maybe_r = maybe_r.map(|r| from_str(&r.body).ok()).flatten();
                 *item.lock().unwrap() = maybe_r;
@@ -74,15 +85,22 @@ impl Database {
                 if post.human_readable_url == "" {
                     post.human_readable_url = to_url_part(&post.content);
                 }
-                fb.at(&("access_hash/".to_owned() + &post.access_hash)).ok().map(|node| {
-                    let b = to_string(&post.id).ok();
-                    b.map(|body| handles.push(node.update_async(body, |_| ())));
-                });
+                if post.access_hash != "" {
+                    fb.at(&("access_hash/".to_owned() + &post.access_hash)).ok().map(|node| {
+                        let b = to_string(&UserFirstPost{
+                            first_post_id: post.id.clone(),
+                        }).ok();
+                        b.map(|body| handles.push(node.update_async(body, |_| ())));
+                    });
+                }
                 fb.at(&("human_readable_url/".to_owned() + &post.human_readable_url)).ok().map(|node| {
-                    let b = to_string(&post.id).ok();
+                    let b = to_string(&Shortened {
+                        post_id: post.id.clone(),
+                    }).ok();
                     b.map(|body| handles.push(node.update_async(body, |_| ())));
                 });
                 fb.at(&("posts/".to_owned() + &post.id + "/data")).ok().map(|node| {
+                    // This `/data` at the end prevents the id="" post from reading all posts in existence when retrieved.
                     let b = to_string(&post).ok();
                     b.map(|body| handles.push(node.set_async(body, |_| ())));
                 });
@@ -94,9 +112,10 @@ impl Database {
     /// Looks up the access hash in the database, to get the first post that was made by it.
     /// Useful for retrieving a post's author (another post).
     pub fn get_first_post(&self, access_hash: &str) -> Option<String> {
+        if access_hash == "" { return None }
         let fb = &self.firebase;
         fb.at(&("access_hash/".to_owned() + access_hash)).ok().map(|node| {
-            node.get().ok().map(|r| from_str(&r.body).ok()).flatten()
+            node.get().ok().map(|r| from_str::<UserFirstPost>(&r.body).ok().map(|u| u.first_post_id)).flatten()
         }).flatten()
     }
     /// Authenticates a user's access token (username+password hashed), returning the first-post ID if there is such a user registered, else `None`.
@@ -109,7 +128,7 @@ impl Database {
     pub fn lookup_url(&self, url: &str) -> Option<String> {
         let fb = &self.firebase;
         fb.at(&("human_readable_url/".to_owned() + url)).ok().map(|node| {
-            node.get().ok().map(|r| from_str(&r.body).ok()).flatten()
+            node.get().ok().map(|r| from_str::<Shortened>(&r.body).ok().map(|s| s.post_id)).flatten()
         }).flatten()
     }
 }

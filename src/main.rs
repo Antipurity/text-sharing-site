@@ -50,7 +50,6 @@ fn main() {
     let data = Arc::new(posts_store::Database::new(firebase));
     data.update(vec![""], |v: Vec<Option<Post>>| {
         if v[0].is_none() {
-            // TODO: ...Since update reads too, shouldn't have a separate `read` (doubling the read-bandwidth), should check whether v[0].is_none().
             println!("Creating the initial post.");
             vec![Some(Post::new_public(Some("".to_string()), "# Text-sharing
 

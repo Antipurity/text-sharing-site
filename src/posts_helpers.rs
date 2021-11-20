@@ -30,7 +30,7 @@ pub enum Which {
     GetParentId, // post → post_id
     GetSummary, // post → string (the first line of content)
     GetContent, // post → string (the whole Markdown content, parsed into HTML)
-    GetPostChildren, // post, user, page_index → array<post> (sorted by descending reward)
+    GetPostChildren, // post, user, page_index, length → array<post> (sorted by descending reward)
     GetPostChildrenLength, // post → length
     GetUserFirstPost, // user → post
     GetAuthorFirstPostId, // post → post_id
@@ -38,7 +38,7 @@ pub enum Which {
     Plus1, // num → num (for recursion, to increment `depth`)
     Less, // num, num → bool
     Equal, // num, num → bool OR str, str → bool
-    Pages, // current, len → array<pagination_pages>
+    Pages, // current_page, length → array<pagination_pages> (length is actual-item-count)
     NewUUID, // → str
 }
 
@@ -167,10 +167,11 @@ impl HelperDef for PostHelper {
                 Some(Some(v)) => match post(v.to_string()) {
                     Some(ref post) => {
                         let fb = &self.data.firebase;
+                        println!("                GetPostChildren user {:?} page {:?} length {:?}", arg(1), arg(2), arg(3));
                         let first_post = auth(str_arg(1));
                         let (start, end) = page(i64_arg(2));
                         let len = i64_arg(3);
-                        let ch = post.get_children_by_reward(fb, start, end, len as usize).unwrap();
+                        let ch = post.get_children_by_reward(fb, start, end, len as usize).unwrap(); // TODO: Why did this panic once again?
                         post_ids_to_post_json(ch, first_post)
                     },
                     None => json!(null),
@@ -178,10 +179,7 @@ impl HelperDef for PostHelper {
                 _ => json!(null),
             },
             Which::GetPostChildrenLength => match arg(0).get("id").map(|v| v.as_str()) {
-                Some(Some(id)) => {
-                    let len = Post::get_children_length(&self.data.firebase, id);
-                    json!(1 + (len-1) / PAGE_LEN) // Always at least 1.
-                },
+                Some(Some(id)) => json!(Post::get_children_length(&self.data.firebase, id)),
                 _ => json!(0i64),
             },
             Which::GetUserFirstPost => match auth(str_arg(0)) {
@@ -211,6 +209,7 @@ impl HelperDef for PostHelper {
             },
             Which::Pages => {
                 let (cur, len) = (i64_arg(0), i64_arg(1));
+                let len = 1 + (len-1) / PAGE_LEN; // Always at least 1.
                 let mut pages: Vec<i64> = Vec::new();
                 let mut push = |p| {
                     if p >= 0 && p < len {

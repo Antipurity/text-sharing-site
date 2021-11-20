@@ -255,6 +255,7 @@ impl Post {
                 n.get().ok()
             }).flatten();
             let ids = response.map(|r| from_str::<Vec<String>>(&r.body).ok()).flatten();
+            // TODO: Why does this fail?
             match ids {
                 Some(ids) => Ok(ids),
                 None => Err(())
