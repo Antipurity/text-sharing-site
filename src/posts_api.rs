@@ -1,4 +1,6 @@
-use std::collections::HashMap;
+use std::thread::JoinHandle;
+use std::sync::Mutex;
+use std::sync::Arc;
 
 mod hashing;
 pub use hashing::access_token_hash;
@@ -81,12 +83,8 @@ pub struct Post {
     reward: i64,
     parent_id: String,
     children_rights: CanPost,
-    children_ids: Vec<String>, // TODO: Don't have this.
-    rewarded_sum: i8,
-    rewarded_posts: HashMap<String, i8>, // -100 (only own posts), -1, 1. // TODO: Don't have this.
-    //   (Only non-empty for initial access_hash posts, meaning, user accounts.)
-    //   (Sum of non -100 rewards should be -10..=10, for balance.)
-    created_post_ids: Vec<String>, // TODO: Don't have this.
+    gave_reward: i8,
+    reverse_reward: i64,
     reverse_date_created: i64,
 }
 
@@ -103,10 +101,8 @@ impl Post {
             reward: 0i64,
             parent_id: id,
             children_rights: CanPost::All,
-            children_ids: Vec::new(), // TODO: Don't do this.
-            rewarded_sum: 0i8,
-            rewarded_posts: HashMap::new(), // TODO: Don't do this.
-            created_post_ids: Vec::new(), // TODO: Don't do this.
+            gave_reward: 0i8,
+            reverse_reward: 0i64,
             reverse_date_created: -timestamp(),
         }
     }
@@ -118,7 +114,7 @@ impl Post {
         let rights = &parent.children_rights;
         if matches!(rights, CanPost::All) || matches!(rights, CanPost::Itself) && &parent.access_hash == access_hash {
             let id = new_uuid();
-            let mut handles: Vec<std::thread::JoinHandle<()>> = vec![];
+            let mut handles: Vec<JoinHandle<()>> = vec![];
             fb.at(&("created_post_ids/".to_owned() + access_hash)).ok().map(|node| {
                 handles.push(node.push_async(&id, |_| ()))
             });
@@ -138,10 +134,8 @@ impl Post {
                     reward: 0i64,
                     parent_id,
                     children_rights,
-                    children_ids: Vec::new(), // TODO: Don't do this.
-                    rewarded_sum: 0i8,
-                    rewarded_posts: HashMap::new(), // TODO: Don't do this.
-                    created_post_ids: Vec::new(), // TODO: Don't do this.
+                    gave_reward: 0i8,
+                    reverse_reward: 0i64,
                     reverse_date_created: -timestamp(),
                 })
             )
@@ -173,11 +167,11 @@ impl Post {
             return (user_first_post, None)
         };
         if amount != -100 {
-            let will_be = user_first_post.rewarded_sum + amount;
+            let will_be = user_first_post.gave_reward + amount;
             if will_be < -10 || will_be > 10 {
                 return (user_first_post, None)
             }
-            user_first_post.rewarded_sum += amount;
+            user_first_post.gave_reward += amount;
         };
         let at = "user_reward/".to_owned() + &user_first_post.id + "/" + &self.id;
         let old = fb.at(&at).ok().map(|n| n.get().ok()).flatten().map(|r| from_str::<i8>(&r.body).ok()).flatten().unwrap_or(0i8);
@@ -186,27 +180,30 @@ impl Post {
         if self.id != user_first_post.id {
             (user_first_post, Some(Post{
                 reward: self.reward + (delta as i64),
+                reverse_reward: self.reverse_reward - (delta as i64),
                 ..self
             }))
         } else {
             (Post{
                 reward: self.reward + (delta as i64),
+                reverse_reward: self.reverse_reward - (delta as i64),
                 ..user_first_post
             }, None)
         }
     }
 
-    /// Returns `{ content, post_reward, user_reward, parent_id, children_rights, access_hash, human_readable_url, logged_in }` as a JSON object. (`.to_string()` will convert it to a JSON string.)
+    /// Returns `{ content, post_reward, user_reward, parent_id, children_rights, access_hash, human_readable_url, logged_in }` as a JSON object, eventually. (`.to_string()` will convert it to a JSON string.)
+    /// 
+    /// Despite the signature, the result contains no error, only different paths depending on whether parallelization is possible; consider using `to_json_sync` if no parallelization is OK.
+    /// 
     /// `content` and `parent_id` and `human_readable_url` are strings, rewards are integers, `children_rights` is 'none'|'itself'|'all', `access_hash` is what the owner's access token must hash to, `logged_in` is a boolean.
-    pub fn to_json(self: &Post, user: Option<&Post>) -> JsonValue {
-        json!({
+    pub fn to_json(self: &Post, fb: &Firebase, user: Option<&Post>) -> Result<JsonValue, Box<dyn FnOnce()->JsonValue>> {
+        let logged_in = user.is_some();
+        let json_value = json!({
             "id": self.id,
             "content": self.content,
             "post_reward": self.reward,
-            "user_reward": match user {
-                Some(u) => u.rewarded_posts.get(&self.id).map_or(0i8, |r| *r), // TODO: Read from Firebase, at users: user_reward/FIRST_POST_ID/POST_ID.
-                None => 0i8,
-            },
+            "user_reward": 0i8,
             "parent_id": self.parent_id,
             "children_rights": self.children_rights.to_string(),
             "access_hash": self.access_hash,
@@ -215,59 +212,59 @@ impl Post {
             }  else {
                 &self.human_readable_url
             },
-            "logged_in": user.is_some(),
-        })
+            "logged_in": logged_in,
+        });
+        if logged_in {
+            let at = "user_reward/".to_owned() + &user.unwrap().id + "/" + &self.id;
+            let value: Arc<Mutex<JsonValue>> = Arc::new(Mutex::new(json_value));
+            let value2 = value.clone();
+            let handle = fb.at(&at).ok().map(|n| n.get_async(move |r| {
+                let user_reward = r.ok().map(|r| from_str::<i8>(&r.body).ok()).flatten().unwrap_or(0i8);
+                let mut l = value2.lock().unwrap();
+                (*l).as_object_mut().unwrap().insert("user_reward".to_owned(), json!(user_reward));
+            }));
+            Err(Box::new(move || {
+                handle.map(|h| h.join());
+                Arc::try_unwrap(value).unwrap().into_inner().unwrap()
+            }))
+        } else {
+            Ok(json_value)
+        }
+    }
+    /// Like `.to_json` but foregoes parallelization.
+    pub fn to_json_sync(self: &Post, fb: &Firebase, user: Option<&Post>) -> JsonValue {
+        match self.to_json(fb, user) {
+            Ok(v) => v,
+            Err(closure) => closure(),
+        }
     }
 
-    /// Gets the specified child-post IDs of a post, most-recent first.
-    /// (Currently not optimized, because there's no need.)
-    pub fn get_children_newest_first(&self, fb: &Firebase, start:usize, end:usize, len:usize) -> Result<Vec<String>, ()> {
+    /// Gets the specified child-post IDs of a post, most-reward first.
+    pub fn get_children_by_reward(&self, fb: &Firebase, start:usize, end:usize, len:usize) -> Result<Vec<String>, ()> {
         let start = std::cmp::min(start, len);
         let end = std::cmp::min(end, len);
         if start <= end {
-            let iter = self.children_ids.iter().rev().skip(start).take(end-start); // TODO: Read from Firebase, via `fb.at(&("children_ids/".to_owned() + &self.id)).unwrap().with_params().start_at(start).limit_to_first(end-start).get().unwrap()` but with error-handling. (Maybe Post should have the date, so that we can `.order_by("reverse_date_created").`)
-            Ok(iter.map(|s| s.clone()).collect())
+            let node = fb.at(&("children_ids/".to_owned() + &self.id)).ok();
+            let response = node.map(|n| {
+                let n = n.with_params().order_by("reverse_reward");
+                let n = n.start_at(start as u32);
+                let n = n.limit_to_first((end-start) as u32);
+                n.get().ok()
+            }).flatten();
+            let ids = response.map(|r| from_str::<Vec<String>>(&r.body).ok()).flatten();
+            match ids {
+                Some(ids) => Ok(ids),
+                None => Err(())
+            }
         } else {
             Err(())
         }
     }
-    pub fn get_children_length(post_id: &str, fb: &Firebase) -> u64 {
-        // TODO: `fb.at(&("children_ids_length/".to_owned() + &self.id))`, but also parse and handle errors.
-        0
-    }
-
-    // TODO: ...Do we even want the funcs (and so helpers) below...
-    /// Gets the specified rewarded-post IDs of a user's first post, in an arbitrary order.
-    /// (Currently not optimized, because there's no need.)
-    pub fn get_rewarded_posts(&self, start:usize, end:usize) -> Result<Vec<String>, ()> {
-        let len = self.rewarded_posts.len(); // TODO: Read from Firebase.
-        let start = std::cmp::min(start, len);
-        let end = std::cmp::min(end, len);
-        if start <= end {
-            let iter = self.rewarded_posts.keys().skip(start).take(end-start); // TODO: Read from Firebase, via `.at("posts_rewarded_posts").unwrap().with_params().start_at(start).limit_to_first(end-start).get().unwrap()` but with error-handling.
-            Ok(iter.map(|s| s.clone()).collect())
-        } else {
-            Err(())
-        }
-    }
-    pub fn get_rewarded_posts_length(&self) -> usize {
-        self.rewarded_posts.len() // TODO: Read from a Firebase counter.
-    }
-
-    /// Gets the specified created-post IDs of a user's first post, most-recent first.
-    /// (Currently not optimized, because there's no need.)
-    pub fn get_created_posts(&self, start:usize, end:usize) -> Result<Vec<String>, ()> {
-        let start = std::cmp::min(start, self.created_post_ids.len()); // TODO: Read from Firebase (need to store a separate counter for this).
-        let end = std::cmp::min(end, self.created_post_ids.len());
-        if start <= end {
-            let iter = self.created_post_ids.iter().rev().skip(start).take(end-start); // TODO: Read from Firebase, via `.at("posts_created_post_ids").unwrap().with_params().start_at(start).limit_to_first(end-start).get().unwrap()` but with error-handling. (Maybe Post should have the negated reward, so that we can `.order_by("reverse_reward").`)
-            Ok(iter.map(|s| s.clone()).collect())
-        } else {
-            Err(())
-        }
-    }
-    pub fn get_created_posts_length(&self) -> usize {
-        self.created_post_ids.len() // TODO: Read from Firebase.
+    pub fn get_children_length(fb: &Firebase, post_id: &str) -> i64 {
+        let node = fb.at(&("children_ids_length/".to_owned() + post_id)).ok();
+        let response = node.map(|n| n.get().ok()).flatten();
+        let len = response.map(|r| from_str::<i64>(&r.body).ok()).flatten();
+        len.unwrap_or(0i64)
     }
 }
 

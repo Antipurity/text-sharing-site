@@ -13,16 +13,18 @@
       {{#if (Less depth 1)}}
         {{> post_edit post=post user=user url=url}}
         {{> post_new_child post=post user=user url=url}}
-        {{#if (Less 1 (GetPostChildrenLength post))}}
-          <div class="btn-group children-pagination">
-            {{#each (Pages page (GetPostChildrenLength post))}}
-              <a href="{{../url}}/{{this}}" class="btn btn-sm {{#if (Equal this ../page)}}btn-outline-dark disabled{{else}}btn-outline-primary{{/if}}">{{Plus1 this}}</a>
-            {{/each}}
-          </div>
-        {{/if}}
-        {{#each (SortedByReward (GetPostChildren post ../user ../page))}}
-          {{> post_component depth=(Plus1 ../depth) max_depth=../max_depth post=this user=../user page=0 url=../url}}
-        {{/each}}
+        {{#with (GetPostChildrenLength post)}}
+          {{#if (Less 1 this)}}
+            <div class="btn-group children-pagination">
+              {{#each (Pages ../page this)}}
+                <a href="{{../../url}}/{{../this}}" class="btn btn-sm {{#if (Equal ../this ../../page)}}btn-outline-dark disabled{{else}}btn-outline-primary{{/if}}">{{Plus1 this}}</a>
+              {{/each}}
+            </div>
+          {{/if}}
+          {{#each (GetPostChildren ../post ../../user ../../page this)}}
+            {{> post_component depth=(Plus1 ../../depth) max_depth=../../max_depth post=../this user=../../user page=0 url=../../url}}
+          {{/each}}
+        {{/with}}
       {{/if}}
     </div>
   </details>

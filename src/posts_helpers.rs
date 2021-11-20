@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::posts_store::Database;
 use crate::posts_api::access_token_hash;
+use crate::posts_api::Post;
 
 use handlebars::{HelperDef, Helper, Handlebars, Context, RenderContext, ScopedJson, RenderError};
 use serde_json::json;
@@ -23,21 +24,16 @@ pub enum Which {
     GetPostById, // post_id, user → post
     GetNotTopLevel, // post → bool
     GetPostReward, // post → num
-    GetUserReward, // post, num → bool (checks equality, for coloring buttons)
+    GetUserReward, // post, num → bool (checks equality of reward and num, for coloring buttons)
     GetEditable, // post, user → bool
     GetPostable, // post, user → bool
     GetParentId, // post → post_id
     GetSummary, // post → string (the first line of content)
     GetContent, // post → string (the whole Markdown content, parsed into HTML)
-    GetPostChildren, // post, user, page_index → array<post>
+    GetPostChildren, // post, user, page_index → array<post> (sorted by descending reward)
     GetPostChildrenLength, // post → length
-    GetUserRewarded, // user, page_index → array<post>
-    GetUserRewardedLength, // user → length
-    GetUserPosts, // user, page_index → array<post>
-    GetUserPostsLength, // user → length
     GetUserFirstPost, // user → post
     GetAuthorFirstPostId, // post → post_id
-    SortedByReward, // array<post> → array<post>
     IsLoggedIn, // user → bool
     Plus1, // num → num (for recursion, to increment `depth`)
     Less, // num, num → bool
@@ -76,7 +72,9 @@ impl HelperDef for PostHelper {
         let post_ids_to_post_json = |ids: Vec<String>, first_post: Option<crate::posts_api::Post>| {
             let posts = self.data.read(ids.iter().map(|s| &s[..]).collect());
             json!(posts.iter().map(|maybe_post| match maybe_post {
-                Some(post) => post.to_json(first_post.as_ref()),
+                Some(post) => post.to_json_sync(&self.data.firebase, first_post.as_ref()),
+                // TODO: ...Can we parallelize the getting of this, because 50 requests to the DB just to get the user reward is way too slow to execute in serial...
+                //   (If .to_json returns an Err, call it later, else it's available now.)
                 None => json!(null),
             }).collect::<handlebars::JsonValue>())
         };
@@ -87,7 +85,7 @@ impl HelperDef for PostHelper {
                     let first_post = auth(str_arg(1));
                     let first_post_ref = first_post.as_ref();
                     match post(str_arg(0).to_string()) {
-                        Some(ref post) => post.to_json(first_post_ref),
+                        Some(ref post) => post.to_json_sync(&self.data.firebase, first_post_ref),
                         None => json!(null),
                     }
                 } else {
@@ -103,13 +101,13 @@ impl HelperDef for PostHelper {
                     None => json!(false),
                 }
             },
-            Which::GetPostReward => match arg(0).get("post_reward") { // TODO: Query Firebase's post_reward/POST_ID.
+            Which::GetPostReward => match arg(0).get("post_reward") {
                 Some(v) => json!(v.as_i64().unwrap()),
                 None => json!(0i64),
             },
             Which::GetUserReward => {
                 let expect = arg(1).as_i64().unwrap();
-                match arg(0).get("user_reward") { // TODO: Read from Firebase's user_reward/ACCESS_TOKEN/POST_ID.
+                match arg(0).get("user_reward") {
                     Some(v) => json!(v.as_i64().unwrap() == expect),
                     None => json!(0i64 == expect),
                 }
@@ -167,53 +165,25 @@ impl HelperDef for PostHelper {
                     Some(ref post) => {
                         let fb = &self.data.firebase;
                         let first_post = auth(str_arg(1));
-                        let (start, end) = page(i64_arg(2)); // TODO: Also accept the length from `GetPostChildrenLength`, and pass it to `get_children_newest_first`.
-                        let ch = post.get_children_newest_first(fb, start, end, 0usize).unwrap();
+                        let (start, end) = page(i64_arg(2));
+                        let len = i64_arg(3);
+                        let ch = post.get_children_by_reward(fb, start, end, len as usize).unwrap();
                         post_ids_to_post_json(ch, first_post)
                     },
                     None => json!(null),
                 },
                 _ => json!(null),
             },
-            Which::GetPostChildrenLength => match arg(0).get("children").map(|v| v.as_i64()) { // TODO: Don't read this prop, instead `crate::posts_api::Post::get_children_length(&self.data.firebase, id)`
-                Some(Some(v)) => json!(1 + (v-1) / PAGE_LEN), // Always at least 1.
+            Which::GetPostChildrenLength => match arg(0).get("id").map(|v| v.as_str()) {
+                Some(Some(id)) => {
+                    let len = Post::get_children_length(&self.data.firebase, id);
+                    json!(1 + (len-1) / PAGE_LEN) // Always at least 1.
+                },
                 _ => json!(0i64),
-            },
-            Which::GetUserRewarded => {
-                match auth(str_arg(0)) {
-                    Some(first_post) => {
-                        let (start, end) = page(i64_arg(1));
-                        let ch = first_post.get_rewarded_posts(start, end).unwrap();
-                        post_ids_to_post_json(ch, Some(first_post))
-                    },
-                    None => json!(null),
-                }
-            },
-            Which::GetUserRewardedLength => {
-                match auth(str_arg(0)) {
-                    Some(first_post) => json!(1 + (first_post.get_rewarded_posts_length() as i64 - 1)/PAGE_LEN),
-                    None => json!(0),
-                }
-            },
-            Which::GetUserPosts => {
-                match auth(str_arg(0)) {
-                    Some(first_post) => {
-                        let (start, end) = page(i64_arg(1));
-                        let ch = first_post.get_created_posts(start, end).unwrap();
-                        post_ids_to_post_json(ch, Some(first_post))
-                    },
-                    None => json!(null),
-                }
-            },
-            Which::GetUserPostsLength => {
-                match auth(str_arg(0)) {
-                    Some(first_post) => json!(1 + (first_post.get_created_posts_length() as i64 - 1)/PAGE_LEN),
-                    None => json!(0),
-                }
             },
             Which::GetUserFirstPost => match auth(str_arg(0)) {
                 Some(first_post) => {
-                    first_post.to_json(Some(&first_post))
+                    first_post.to_json_sync(&self.data.firebase, Some(&first_post))
                 },
                 None => {
                     json!(null)
@@ -225,21 +195,6 @@ impl HelperDef for PostHelper {
                     .map_or_else(|| json!(null), |id: String| json!(id))
                 },
                 _ => json!(null),
-            },
-            Which::SortedByReward => {
-                // TODO: Maybe, query Firebase instead.
-                if arg(0).is_array() {
-                    let mut vecs = arg(0).as_array().unwrap().clone();
-                    vecs.sort_by_cached_key(|v| {
-                        match v.get("post_reward") {
-                            Some(r) => -r.as_i64().unwrap_or(0i64),
-                            None => 0i64,
-                        }
-                    });
-                    json!(vecs)
-                } else {
-                    json!(null)
-                }
             },
             Which::IsLoggedIn => json!(str_arg(0) != ""),
             Which::Plus1 => json!(i64_arg(0) + 1),
@@ -290,13 +245,8 @@ impl PostHelper {
         f("GetContent", Which::GetContent);
         f("GetPostChildren", Which::GetPostChildren);
         f("GetPostChildrenLength", Which::GetPostChildrenLength);
-        f("GetUserRewarded", Which::GetUserRewarded);
-        f("GetUserRewardedLength", Which::GetUserRewardedLength);
-        f("GetUserPosts", Which::GetUserPosts);
-        f("GetUserPostsLength", Which::GetUserPostsLength);
         f("GetUserFirstPost", Which::GetUserFirstPost);
         f("GetAuthorFirstPostId", Which::GetAuthorFirstPostId);
-        f("SortedByReward", Which::SortedByReward);
         f("IsLoggedIn", Which::IsLoggedIn);
         f("Plus1", Which::Plus1);
         f("Less", Which::Less);
