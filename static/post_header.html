@@ -50,7 +50,7 @@
   {{/if}}
   {{#if post}}
     <div class="extra-post-info">
-      <div>{{children_length}} comments</div>
+      <div>{{post.children_length}} comment{{#if (Less 1 post.children_length)}}s{{/if}}{{#if (Equal 0 post.children_length)}}s{{/if}}</div>
       {{#with (GetPostById (GetAuthorFirstPostId post) "")}}
         <a href="{{human_readable_url}}">by {{GetSummary this}}</a>
       {{/with}}

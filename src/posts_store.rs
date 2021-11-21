@@ -119,6 +119,7 @@ impl Database {
                         let b = to_string(&UserFirstPost{
                             first_post_id: post.id.clone(),
                         }).ok();
+                        // TODO: This overwrites what was there; how to not? A DB rule, maybe?
                         b.map(|body| handles.push(node.update_async(body, |_| ())));
                     });
                 }

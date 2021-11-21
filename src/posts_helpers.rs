@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use crate::posts_store::Database;
 use crate::posts_api::access_token_hash;
-use crate::posts_api::Post;
 
 use handlebars::{HelperDef, Helper, Handlebars, Context, RenderContext, ScopedJson, RenderError, JsonValue};
 use serde_json::json;
@@ -30,8 +29,7 @@ pub enum Which {
     GetParentId, // post → post_id
     GetSummary, // post → string (the first line of content)
     GetContent, // post → string (the whole Markdown content, parsed into HTML)
-    GetPostChildren, // post, user, page_index, length → array<post> (sorted by descending reward)
-    GetPostChildrenLength, // post → length
+    GetPostChildren, // post, user, page_index, length → array<post> (sorted by descending reward) (`length` should be `post.children_length`)
     GetUserFirstPost, // user → post
     GetAuthorFirstPostId, // post → post_id
     IsLoggedIn, // user → bool
@@ -167,7 +165,6 @@ impl HelperDef for PostHelper {
                 Some(Some(v)) => match post(v.to_string()) {
                     Some(ref post) => {
                         let fb = &self.data.firebase;
-                        println!("                GetPostChildren user {:?} page {:?} length {:?}", arg(1), arg(2), arg(3)); // TODO:
                         let first_post = auth(str_arg(1));
                         let (start, end) = page(i64_arg(2));
                         let len = i64_arg(3);
@@ -177,10 +174,6 @@ impl HelperDef for PostHelper {
                     None => json!(null),
                 },
                 _ => json!(null),
-            },
-            Which::GetPostChildrenLength => match arg(0).get("id").map(|v| v.as_str()) {
-                Some(Some(id)) => json!(Post::get_children_length(&self.data.firebase, id)),
-                _ => json!(0i64),
             },
             Which::GetUserFirstPost => match auth(str_arg(0)) {
                 Some(first_post) => {
@@ -246,7 +239,6 @@ impl PostHelper {
         f("GetSummary", Which::GetSummary);
         f("GetContent", Which::GetContent);
         f("GetPostChildren", Which::GetPostChildren);
-        f("GetPostChildrenLength", Which::GetPostChildrenLength);
         f("GetUserFirstPost", Which::GetUserFirstPost);
         f("GetAuthorFirstPostId", Which::GetAuthorFirstPostId);
         f("IsLoggedIn", Which::IsLoggedIn);

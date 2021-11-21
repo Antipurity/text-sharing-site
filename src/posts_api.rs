@@ -86,7 +86,6 @@ pub struct Post {
     parent_id: String,
     children_rights: CanPost,
     gave_reward: i8,
-    reverse_reward: i64,
     reverse_date_created: i64,
 }
 
@@ -104,7 +103,6 @@ impl Post {
             parent_id: id,
             children_rights: CanPost::All,
             gave_reward: 0i8,
-            reverse_reward: 0i64,
             reverse_date_created: -timestamp(),
         }
     }
@@ -141,7 +139,6 @@ impl Post {
                     parent_id,
                     children_rights,
                     gave_reward: 0i8,
-                    reverse_reward: 0i64,
                     reverse_date_created: -timestamp(),
                 })
             )
@@ -184,6 +181,7 @@ impl Post {
         to_string::<i8>(&amount).ok().map(|string| fb.at(&at).ok().map(|n| n.update(&string).ok()));
         let delta = amount - old;
         let reward = self.reward + (delta as i64);
+        fb.at(&at).ok().map(|n| to_string(&amount).ok().map(|s| n.set(&s).ok())).flatten().flatten();
         fb.at(&fb_path(&["children", &self.parent_id])).ok().map(|node| {
             // Update the reward in the child-list.
             let b = Some(format!("{{\"{}\":{}}}", self.id, -reward));
@@ -192,13 +190,11 @@ impl Post {
         if self.id != user_first_post.id {
             (user_first_post, Some(Post{
                 reward,
-                reverse_reward: -reward,
                 ..self
             }))
         } else {
             (Post{
                 reward,
-                reverse_reward: -reward,
                 ..user_first_post
             }, None)
         }
@@ -216,6 +212,7 @@ impl Post {
             "content": self.content,
             "post_reward": self.reward,
             "user_reward": 0i8,
+            "children_length": 0i64,
             "parent_id": self.parent_id,
             "children_rights": self.children_rights.to_string(),
             "access_hash": self.access_hash,
@@ -227,16 +224,23 @@ impl Post {
             "logged_in": logged_in,
         });
         if logged_in {
-            let at = fb_path(&["user_reward", &user.unwrap().id, &self.id]);
             let value: Arc<Mutex<JsonValue>> = Arc::new(Mutex::new(json_value));
             let value2 = value.clone();
+            let value3 = value.clone();
+            let at = fb_path(&["user_reward", &user.unwrap().id, &self.id]);
             let handle = fb.at(&at).ok().map(|n| n.get_async(move |r| {
                 let user_reward = r.ok().map(|r| from_str::<i8>(&r.body).ok()).flatten().unwrap_or(0i8);
                 let mut l = value2.lock().unwrap();
                 (*l).as_object_mut().unwrap().insert("user_reward".to_owned(), json!(user_reward));
             }));
+            let handle2 = fb.at(&fb_path(&["children_length", &self.id])).ok().map(|n| n.get_async(move |r| {
+                let len = r.ok().map(|r| from_str::<i64>(&r.body).ok()).flatten().unwrap_or(0i64);
+                let mut l = value3.lock().unwrap();
+                (*l).as_object_mut().unwrap().insert("children_length".to_owned(), json!(len));
+            }));
             Err(Box::new(move || {
                 handle.map(|h| h.join());
+                handle2.map(|h| h.join());
                 Arc::try_unwrap(value).unwrap().into_inner().unwrap()
             }))
         } else {
@@ -262,7 +266,9 @@ impl Post {
                 //   But life persists despite that.
                 let mut n = n.with_params();
                 let url = Arc::get_mut(&mut n.url).unwrap();
-                url.set_query(Some(&format!("startAt={}&limitToFirst={}&orderBy={}", start, end-start, "\"$value\"")));
+                // Firebase is so broken that it doesn't support index-based filtering, so we have to retrieve basically all data and filter client-side.
+                //   Going to the first page is cheap, but the last page is the most expensive.
+                url.set_query(Some(&format!("orderBy={}&limitToFirst={}", "\"$value\"", end)));
                 n.get().ok()
             }).flatten();
             let ids = response.map(|r| {
@@ -271,6 +277,7 @@ impl Post {
                     // Sort IDs manually, because Firebase doesn't want to.
                     let mut ids: Vec<String> = m.keys().map(|k| k.clone()).collect();
                     ids.sort_by_key(|id| m[id]);
+                    if start > 0 { ids.drain(..start); } // Filter client-side.
                     ids
                 })
             }).flatten();
@@ -281,12 +288,6 @@ impl Post {
         } else {
             Err(())
         }
-    }
-    pub fn get_children_length(fb: &Firebase, post_id: &str) -> i64 {
-        let node = fb.at(&fb_path(&["children_length", post_id])).ok();
-        let response = node.map(|n| n.get().ok()).flatten();
-        let len = response.map(|r| from_str::<i64>(&r.body).ok()).flatten();
-        len.unwrap_or(0i64)
     }
 }
 
