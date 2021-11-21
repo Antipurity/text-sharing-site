@@ -1,9 +1,9 @@
 <div class="login-header smaller-font">
   {{#if (IsLoggedIn user)}}
-    {{#with (GetUserFirstPost user)}}
-      <a href="{{human_readable_url}}">Logged in as {{GetSummary this}}</a>
-      |
-    {{/with}}
+    <!-- Theoretically, the first post's summary is a good source of the username to display here. -->
+    <!--   Practically, Handlebars templates aren't async, so an extra roundtrip to Firebase is no good for speed. -->
+    <a href="/user/{{Hash user}}">Logged in</a>
+    |
     <form action="/login" method="post">
       <input type="hidden" name="user" value="">
       <button class="btn btn-outline-secondary" name="url" value="{{url}}">Logout</button>

@@ -11,7 +11,7 @@
     <main>
       {{#with (GetPostById post user)}}
         {{> post_login user=../user url=human_readable_url}}
-        {{> post_component depth=0 max_depth=../max_depth post=this user=../user page=../page url=human_readable_url}}
+        {{> post_component depth=0 max_depth=../max_depth post=this user=../user page=../page url=human_readable_url include_self_link=../include_self_link}}
       {{/with}}
     </main>
     <!-- Fix Chrome's transition-firing-on-load bug, probably: -->

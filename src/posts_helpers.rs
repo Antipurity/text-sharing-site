@@ -31,14 +31,14 @@ pub enum Which {
     GetSummary, // post → string (the first line of content)
     GetContent, // post → string (the whole Markdown content, parsed into HTML)
     GetPostChildren, // post, user, page_index, length → array<post> (sorted by descending reward) (`length` should be `post.children_length`)
-    GetUserFirstPost, // user → post
-    GetAuthorFirstPostId, // post → post_id
+    GetUserFirstPostId, // user → post_id
     IsLoggedIn, // user → bool
     Plus1, // num → num (for recursion, to increment `depth`)
     Less, // num, num → bool
     Equal, // num, num → bool OR str, str → bool
     Pages, // current_page, length → array<pagination_pages> (length is actual-item-count)
     NewUUID, // → str
+    Hash, // str → str (pass in the `user` to get something that you can expose other users)
 }
 
 
@@ -60,8 +60,8 @@ impl HelperDef for PostHelper {
         let str_arg = |i| arg(i).as_str().unwrap();
         let i64_arg = |i| arg(i).as_i64().unwrap();
         let post = |id: String| self.data.read(vec!(&id)).pop().unwrap(); // TODO: Go through `post(`.
-        let auth = |user| match self.data.login(user).map(post) {
-            Some(Some(first_post)) => Some(first_post),
+        let auth = |user| match self.data.login(user).map(post) { // TODO: Go through `auth(`.
+            Some(Some(first_post_id)) => Some(first_post_id),
             _ => None,
         };
         let page = |i| {
@@ -173,20 +173,9 @@ impl HelperDef for PostHelper {
                 },
                 _ => json!(null),
             },
-            Which::GetUserFirstPost => match auth(str_arg(0)) {
-                Some(first_post) => {
-                    first_post.to_json_sync(&self.data.firebase, Some(&first_post))
-                },
-                None => {
-                    json!(null)
-                },
-            },
-            Which::GetAuthorFirstPostId => match arg(0).get("access_hash").map(|v| v.as_str()) {
-                Some(Some(access_hash)) => {
-                    self.data.get_first_post(access_hash) // TODO: ...But this triggers a sequential lookup too, on every child... What, should first-post-ID be a part of JSON too...
-                    .map_or_else(|| json!(null), |id: String| json!(id))
-                },
-                _ => json!(null),
+            // TODO: Also, why does the user's first post get read literally 5 times? (The others are good by now, only read once.)
+            Which::GetUserFirstPostId => {
+                json!(self.data.get_first_post(&str_arg(0)).unwrap_or_else(|| "".to_owned()))
             },
             Which::IsLoggedIn => json!(str_arg(0) != ""),
             Which::Plus1 => json!(i64_arg(0) + 1),
@@ -220,6 +209,7 @@ impl HelperDef for PostHelper {
                 json!(pages)
             },
             Which::NewUUID => json!(crate::posts_api::new_uuid()),
+            Which::Hash => json!(access_token_hash(str_arg(0))),
         })
     }
 }
@@ -237,13 +227,13 @@ impl PostHelper {
         f("GetSummary", Which::GetSummary);
         f("GetContent", Which::GetContent);
         f("GetPostChildren", Which::GetPostChildren);
-        f("GetUserFirstPost", Which::GetUserFirstPost);
-        f("GetAuthorFirstPostId", Which::GetAuthorFirstPostId);
+        f("GetUserFirstPostId", Which::GetUserFirstPostId);
         f("IsLoggedIn", Which::IsLoggedIn);
         f("Plus1", Which::Plus1);
         f("Less", Which::Less);
         f("Equal", Which::Equal);
         f("Pages", Which::Pages);
         f("NewUUID", Which::NewUUID);
+        f("Hash", Which::Hash);
     }
 }

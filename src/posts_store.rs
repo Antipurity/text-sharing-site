@@ -138,7 +138,7 @@ impl Database {
         for handle in handles { handle.join().unwrap(); }
     }
 
-    /// Looks up the access hash in the database, to get the first post that was made by it.
+    /// Looks up the access hash in the database, to get the first post ID that was made by it.
     /// Useful for retrieving a post's author (another post).
     pub fn get_first_post(&self, access_hash: &str) -> Option<String> {
         if access_hash == "" { return None }

@@ -121,3 +121,7 @@ div.login-header>* {
 code {
     font-size: 1em;
 }
+
+form {
+    margin: 0;
+}
