@@ -59,20 +59,16 @@ impl HelperDef for PostHelper {
         let arg = |i| h.param(i).unwrap().value();
         let str_arg = |i| arg(i).as_str().unwrap();
         let i64_arg = |i| arg(i).as_i64().unwrap();
-        let post = |id: String| self.data.read(vec!(&id)).pop().unwrap(); // TODO: Go through `post(`.
-        let auth = |user| match self.data.login(user).map(post) { // TODO: Go through `auth(`.
-            Some(Some(first_post_id)) => Some(first_post_id),
-            _ => None,
-        };
+        let auth = |user| self.data.login(user);
         let page = |i| {
             let start = (i * PAGE_LEN) as usize;
             (start, start + PAGE_LEN as usize)
         };
-        let post_ids_to_post_json = |ids: Vec<String>, first_post: Option<crate::posts_api::Post>| {
+        let post_ids_to_post_json = |ids: Vec<String>, first_post_id: Option<&str>| {
             // Collect user-data rewards in parallel.
             let mut posts = self.data.read(ids.iter().map(|s| &s[..]).collect());
             let mut perhaps_promises = posts.drain(..).map(|maybe_post| match maybe_post {
-                Some(post) => post.to_json(&self.data.firebase, first_post.as_ref()),
+                Some(post) => post.to_json(&self.data.firebase, first_post_id),
                 None => Ok(json!(null)),
             }).collect::<Vec<Result<JsonValue, Box<dyn FnOnce()->JsonValue>>>>();
             json!(perhaps_promises.drain(..).map(|p| match p {
@@ -84,10 +80,10 @@ impl HelperDef for PostHelper {
         f(match &self.which {
             Which::GetPostById => {
                 if arg(0).is_string() {
-                    let first_post = auth(str_arg(1));
-                    let first_post_ref = first_post.as_ref();
+                    let post = |id: String| self.data.read(vec!(&id)).pop().unwrap();
+                    let first_post_id = auth(str_arg(1));
                     match post(str_arg(0).to_string()) {
-                        Some(ref post) => post.to_json_sync(&self.data.firebase, first_post_ref),
+                        Some(ref post) => post.to_json_sync(&self.data.firebase, first_post_id().as_deref()),
                         None => json!(null),
                     }
                 } else {
@@ -165,17 +161,16 @@ impl HelperDef for PostHelper {
             Which::GetPostChildren => match arg(0).get("id").map(|v| v.as_str()) {
                 Some(Some(id)) => {
                     let fb = &self.data.firebase;
-                    let first_post = auth(str_arg(1));
+                    let first_post_id = auth(str_arg(1));
                     let (start, end) = page(i64_arg(2));
                     let len = i64_arg(3);
                     let ch = Post::get_children_by_reward(id, fb, start, end, len as usize).unwrap();
-                    post_ids_to_post_json(ch, first_post)
+                    post_ids_to_post_json(ch, first_post_id().as_deref())
                 },
                 _ => json!(null),
             },
-            // TODO: Also, why does the user's first post get read literally 5 times? (The others are good by now, only read once.)
             Which::GetUserFirstPostId => {
-                json!(self.data.get_first_post(&str_arg(0)).unwrap_or_else(|| "".to_owned()))
+                json!(self.data.get_first_post(&str_arg(0))().unwrap_or_else(|| "".to_owned()))
             },
             Which::IsLoggedIn => json!(str_arg(0) != ""),
             Which::Plus1 => json!(i64_arg(0) + 1),

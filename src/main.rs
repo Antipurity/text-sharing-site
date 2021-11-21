@@ -149,7 +149,7 @@ That's all you need to know. Good luck.
                 let url = get(map, "url");
                 match map.find(&["user"]) {
                     Some(&Value::String(ref access_token)) => {
-                        match data.login(access_token) {
+                        match data.login(access_token)() {
                             Some(_first_post_id) => {
                                 let url = url.unwrap_or_else(|| "/".to_string());
                                 Ok(Response::with((elsewhere, login_cookie(access_token), RedirectRaw(url))))
@@ -171,7 +171,7 @@ That's all you need to know. Good luck.
                 if parent_id.is_none() || content.is_none() || rights.is_none() || user.is_none() { return fail() };
                 let (parent_id, content, rights, user) = (parent_id.unwrap(), content.unwrap(), rights.unwrap(), user.unwrap());
                 if let Ok(rights) = rights.parse::<CanPost>() {
-                    let maybe_first_post_id = data.login(&user);
+                    let maybe_first_post_id = data.login(&user)();
                     let was_logged_in = maybe_first_post_id.is_some();
                     let ids: Vec<&str> = vec![&parent_id];
                     data.update(ids, |mut posts| {
@@ -220,7 +220,7 @@ That's all you need to know. Good luck.
                 if post_id.is_none() || amount.is_none() { return fail() };
                 let (post_id, amount) = (post_id.unwrap(), amount.unwrap());
                 if let Ok(amount) = amount.parse::<i8>() {
-                    match data.login(&user) {
+                    match data.login(&user)() {
                         Some(first_post_id) => {
                             data.update(vec![&post_id, &first_post_id], |mut posts| {
                                 if posts.iter().any(|p| p.is_none()) { return vec![] };

@@ -205,8 +205,8 @@ impl Post {
     /// Despite the signature, the result contains no error, only different paths depending on whether parallelization is possible; consider using `to_json_sync` if no parallelization is OK.
     /// 
     /// `content` and `parent_id` and `human_readable_url` are strings, rewards are integers, `children_rights` is 'none'|'itself'|'all', `access_hash` is what the owner's access token must hash to, `logged_in` is a boolean.
-    pub fn to_json(self: &Post, fb: &Firebase, user: Option<&Post>) -> Result<JsonValue, Box<dyn FnOnce()->JsonValue>> {
-        let logged_in = user.is_some();
+    pub fn to_json(self: &Post, fb: &Firebase, user_first_post_id: Option<&str>) -> Result<JsonValue, Box<dyn FnOnce()->JsonValue>> {
+        let logged_in = user_first_post_id.is_some();
         let json_value = json!({
             "id": self.id,
             "content": self.content,
@@ -227,7 +227,7 @@ impl Post {
             let value: Arc<Mutex<JsonValue>> = Arc::new(Mutex::new(json_value));
             let value2 = value.clone();
             let value3 = value.clone();
-            let at = fb_path(&["user_reward", &user.unwrap().id, &self.id]);
+            let at = fb_path(&["user_reward", user_first_post_id.unwrap(), &self.id]);
             let handle = fb.at(&at).ok().map(|n| n.get_async(move |r| {
                 let user_reward = r.ok().map(|r| from_str::<i8>(&r.body).ok()).flatten().unwrap_or(0i8);
                 let mut l = value2.lock().unwrap();
@@ -248,8 +248,8 @@ impl Post {
         }
     }
     /// Like `.to_json` but foregoes parallelization.
-    pub fn to_json_sync(self: &Post, fb: &Firebase, user: Option<&Post>) -> JsonValue {
-        match self.to_json(fb, user) {
+    pub fn to_json_sync(self: &Post, fb: &Firebase, user_first_post_id: Option<&str>) -> JsonValue {
+        match self.to_json(fb, user_first_post_id) {
             Ok(v) => v,
             Err(closure) => closure(),
         }

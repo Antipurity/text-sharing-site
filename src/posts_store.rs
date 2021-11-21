@@ -140,15 +140,26 @@ impl Database {
 
     /// Looks up the access hash in the database, to get the first post ID that was made by it.
     /// Useful for retrieving a post's author (another post).
-    pub fn get_first_post(&self, access_hash: &str) -> Option<String> {
-        if access_hash == "" { return None }
+    /// Call the returned closure to get the result (the request is done async, so this is likely faster).
+    pub fn get_first_post(&self, access_hash: &str) -> Box<dyn FnOnce()->Option<String>> {
+        if access_hash == "" { return Box::new(|| None) }
         let fb = &self.firebase;
-        fb.at(&fb_path(&["access_hash", access_hash])).ok().map(|node| {
-            node.get().ok().map(|r| from_str::<UserFirstPost>(&r.body).ok().map(|u| u.first_post_id)).flatten()
-        }).flatten()
+        let value: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
+        let value2 = value.clone();
+        let at = fb_path(&["access_hash", access_hash]);
+        let handle = fb.at(&at).ok().map(|n| n.get_async(move |r| {
+            let id = r.ok().map(|r| from_str::<UserFirstPost>(&r.body).ok().map(|u| u.first_post_id)).flatten().unwrap_or_else(|| "".to_owned());
+            let mut l = value2.lock().unwrap();
+            (*l).replace_range(.., &id);
+        }));
+        Box::new(move || {
+            handle.map(|h| h.join());
+            Some(Arc::try_unwrap(value).unwrap().into_inner().unwrap())
+        })
     }
     /// Authenticates a user's access token (username+password hashed), returning the first-post ID if there is such a user registered, else `None`.
-    pub fn login(&self, user: &str) -> Option<String> {
+    /// Call the returned closure to get the result (the request is done async, so this is likely faster).
+    pub fn login(&self, user: &str) -> Box<dyn FnOnce()->Option<String>> {
         return self.get_first_post(&crate::posts_api::access_token_hash(user))
     }
     /// Converts a human-readable URL to the post ID, if present in the database.
