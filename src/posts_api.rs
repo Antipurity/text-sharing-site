@@ -256,11 +256,11 @@ impl Post {
     }
 
     /// Gets the specified child-post IDs of a post, most-reward first.
-    pub fn get_children_by_reward(&self, fb: &Firebase, start:usize, end:usize, len:usize) -> Result<Vec<String>, ()> {
+    pub fn get_children_by_reward(id: &str, fb: &Firebase, start:usize, end:usize, len:usize) -> Result<Vec<String>, ()> {
         let start = std::cmp::min(start, len);
         let end = std::cmp::min(end, len);
         if start <= end {
-            let node = fb.at(&(fb_path(&["children", &self.id]))).ok();
+            let node = fb.at(&(fb_path(&["children", id]))).ok();
             let response = node.map(|n| {
                 // `firebase_rs` is so broken, it can't even set more than one param in one query with any of its methods.
                 //   But life persists despite that.

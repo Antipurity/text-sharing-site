@@ -51,6 +51,7 @@
   {{#if post}}
     <div class="extra-post-info">
       <div>{{post.children_length}} comment{{#if (Less 1 post.children_length)}}s{{/if}}{{#if (Equal 0 post.children_length)}}s{{/if}}</div>
+      <!-- TODO: Do we really want to trigger a sequential DB lookup for every post? -->
       {{#with (GetPostById (GetAuthorFirstPostId post) "")}}
         <a href="{{human_readable_url}}">by {{GetSummary this}}</a>
       {{/with}}

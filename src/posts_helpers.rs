@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use crate::posts_store::Database;
 use crate::posts_api::access_token_hash;
+use crate::posts_api::Post;
 
 use handlebars::{HelperDef, Helper, Handlebars, Context, RenderContext, ScopedJson, RenderError, JsonValue};
 use serde_json::json;
@@ -58,7 +59,7 @@ impl HelperDef for PostHelper {
         let arg = |i| h.param(i).unwrap().value();
         let str_arg = |i| arg(i).as_str().unwrap();
         let i64_arg = |i| arg(i).as_i64().unwrap();
-        let post = |id: String| self.data.read(vec!(&id)).pop().unwrap();
+        let post = |id: String| self.data.read(vec!(&id)).pop().unwrap(); // TODO: Go through `post(`.
         let auth = |user| match self.data.login(user).map(post) {
             Some(Some(first_post)) => Some(first_post),
             _ => None,
@@ -162,16 +163,13 @@ impl HelperDef for PostHelper {
                 _ => json!(""),
             },
             Which::GetPostChildren => match arg(0).get("id").map(|v| v.as_str()) {
-                Some(Some(v)) => match post(v.to_string()) {
-                    Some(ref post) => {
-                        let fb = &self.data.firebase;
-                        let first_post = auth(str_arg(1));
-                        let (start, end) = page(i64_arg(2));
-                        let len = i64_arg(3);
-                        let ch = post.get_children_by_reward(fb, start, end, len as usize).unwrap();
-                        post_ids_to_post_json(ch, first_post)
-                    },
-                    None => json!(null),
+                Some(Some(id)) => {
+                    let fb = &self.data.firebase;
+                    let first_post = auth(str_arg(1));
+                    let (start, end) = page(i64_arg(2));
+                    let len = i64_arg(3);
+                    let ch = Post::get_children_by_reward(id, fb, start, end, len as usize).unwrap();
+                    post_ids_to_post_json(ch, first_post)
                 },
                 _ => json!(null),
             },
@@ -185,7 +183,7 @@ impl HelperDef for PostHelper {
             },
             Which::GetAuthorFirstPostId => match arg(0).get("access_hash").map(|v| v.as_str()) {
                 Some(Some(access_hash)) => {
-                    self.data.get_first_post(access_hash)
+                    self.data.get_first_post(access_hash) // TODO: ...But this triggers a sequential lookup too, on every child... What, should first-post-ID be a part of JSON too...
                     .map_or_else(|| json!(null), |id: String| json!(id))
                 },
                 _ => json!(null),

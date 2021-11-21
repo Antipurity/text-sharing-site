@@ -1,6 +1,6 @@
 <article class="post">
   {{#if (GetNotTopLevel post)}}
-    {{#if (Less depth 1)}}
+    {{#if (Equal depth 0)}}
       <a href="{{lookup (GetPostById (lookup post "parent_id") user) "human_readable_url"}}">↑ parent</a>
     {{/if}}
   {{/if}}

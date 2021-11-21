@@ -83,7 +83,7 @@ That's all you need to know. Good luck.
     let templates = templates;
     let render = |data: &posts_store::Database, templates: &Handlebars, name: &str, user: &str, post_id: &str, page:u64| {
         let post = |id: &str| data.read(vec!(id)).pop().unwrap();
-        let post = post(post_id);
+        let post = post(post_id); // TODO: Why is there a read JUST to know the human-readable URL of what's requested?
         let body = templates.render(name, &json!({
             "user": user,
             "post": post_id,
