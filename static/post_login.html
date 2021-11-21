@@ -1,7 +1,7 @@
 <div class="login-header smaller-font">
   {{#if (IsLoggedIn user)}}
     <!-- Theoretically, the first post's summary is a good source of the username to display here. -->
-    <!--   Practically, Handlebars templates aren't async, so an extra roundtrip to Firebase is no good for speed. -->
+    <!--   Practically, Handlebars templates aren't async, so an extra roundtrip to Firebase is no good for speed. And storing it with access_hash is too fiddly. -->
     <a href="/user/{{Hash user}}">Logged in</a>
     |
     <form action="/login" method="post">

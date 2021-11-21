@@ -223,29 +223,26 @@ impl Post {
             },
             "logged_in": logged_in,
         });
-        if logged_in {
-            let value: Arc<Mutex<JsonValue>> = Arc::new(Mutex::new(json_value));
-            let value2 = value.clone();
-            let value3 = value.clone();
-            let at = fb_path(&["user_reward", user_first_post_id.unwrap(), &self.id]);
-            let handle = fb.at(&at).ok().map(|n| n.get_async(move |r| {
+        let value0: Arc<Mutex<JsonValue>> = Arc::new(Mutex::new(json_value));
+        let handle1 = if logged_in {
+            let value1 = value0.clone();
+            fb.at(&fb_path(&["user_reward", user_first_post_id.unwrap(), &self.id])).ok().map(|n| n.get_async(move |r| {
                 let user_reward = r.ok().map(|r| from_str::<i8>(&r.body).ok()).flatten().unwrap_or(0i8);
-                let mut l = value2.lock().unwrap();
+                let mut l = value1.lock().unwrap();
                 (*l).as_object_mut().unwrap().insert("user_reward".to_owned(), json!(user_reward));
-            }));
-            let handle2 = fb.at(&fb_path(&["children_length", &self.id])).ok().map(|n| n.get_async(move |r| {
-                let len = r.ok().map(|r| from_str::<i64>(&r.body).ok()).flatten().unwrap_or(0i64);
-                let mut l = value3.lock().unwrap();
-                (*l).as_object_mut().unwrap().insert("children_length".to_owned(), json!(len));
-            }));
-            Err(Box::new(move || {
-                handle.map(|h| h.join());
-                handle2.map(|h| h.join());
-                Arc::try_unwrap(value).unwrap().into_inner().unwrap()
             }))
-        } else {
-            Ok(json_value)
-        }
+        } else { None };
+        let value2 = value0.clone();
+        let handle2 = fb.at(&fb_path(&["children_length", &self.id])).ok().map(|n| n.get_async(move |r| {
+            let len = r.ok().map(|r| from_str::<i64>(&r.body).ok()).flatten().unwrap_or(0i64);
+            let mut l = value2.lock().unwrap();
+            (*l).as_object_mut().unwrap().insert("children_length".to_owned(), json!(len));
+        }));
+        Err(Box::new(move || {
+            handle1.map(|h| h.join());
+            handle2.map(|h| h.join());
+            Arc::try_unwrap(value0).unwrap().into_inner().unwrap()
+        }))
     }
     /// Like `.to_json` but foregoes parallelization.
     pub fn to_json_sync(self: &Post, fb: &Firebase, user_first_post_id: Option<&str>) -> JsonValue {

@@ -1,7 +1,4 @@
 //! Stores posts in Firebase.
-//!   TODO: Test it fully, and make it work fully.
-//!   TODO: Maybe, try to look up a post's comment-count async too, in `.to_json`.
-//!     (...Also, why doesn't it work now/still.)
 
 
 
@@ -83,9 +80,6 @@ impl Database {
             let maybe_node = fb.at(&fb_path(&["posts", id])).ok();
             handles.push(maybe_node.map(|node| node.get_async(move |res| {
                 let maybe_r = res.ok();
-                if let Some(ref r) = maybe_r {
-                    println!("    {}", r.body); // TODO: Reading works now, so, remove this print. (Or maybe, debug why a simple post-view involves 3 reads of the post.)
-                }
                 let maybe_r = maybe_r.map(|r| from_str(&r.body).ok()).flatten();
                 *item.lock().unwrap() = maybe_r;
             })));
@@ -116,10 +110,10 @@ impl Database {
                 }
                 if post.access_hash != "" {
                     fb.at(&fb_path(&["access_hash", &post.access_hash])).ok().map(|node| {
+                        // To not overwrite, this needs a `".validate": "!data.exists()"` rule on `"access_hash"/"$hash"`.
                         let b = to_string(&UserFirstPost{
                             first_post_id: post.id.clone(),
                         }).ok();
-                        // TODO: This overwrites what was there; how to not? A DB rule, maybe?
                         b.map(|body| handles.push(node.update_async(body, |_| ())));
                     });
                 }
@@ -154,7 +148,8 @@ impl Database {
         }));
         Box::new(move || {
             handle.map(|h| h.join());
-            Some(Arc::try_unwrap(value).unwrap().into_inner().unwrap())
+            let s = Arc::try_unwrap(value).unwrap().into_inner().unwrap();
+            if s != "" {Some(s)} else {None}
         })
     }
     /// Authenticates a user's access token (username+password hashed), returning the first-post ID if there is such a user registered, else `None`.
