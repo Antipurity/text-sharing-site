@@ -81,14 +81,11 @@ That's all you need to know. Good luck.
 
 
     let templates = templates;
-    let render = |data: &posts_store::Database, templates: &Handlebars, name: &str, user: &str, post_id: &str, page:u64| {
-        let post = |id: &str| data.read(vec!(id)).pop().unwrap();
-        let post = post(post_id); // TODO: Why is there a read JUST to know the human-readable URL of what's requested?
+    let render = |templates: &Handlebars, name: &str, user: &str, post_id: &str, page:u64| {
         let body = templates.render(name, &json!({
             "user": user,
             "post": post_id,
             "page": page,
-            "url": "/post/".to_owned() + &post.map_or_else(|| "".to_owned(), |post| post.human_readable_url),
             "max_depth": 1,
         })).unwrap();
         Ok(Response::with((mime!(Text/Html), status::Ok, body)))
@@ -138,7 +135,7 @@ That's all you need to know. Good luck.
         let elsewhere = status::SeeOther;
         match req.url.path()[..] {
             [""] => {
-                render(&data, &templates, "post", &user, "", 0)
+                render(&templates, "post", &user, "", 0)
             },
             ["login"] => { // url, user
                 // It's unclear how the `params` crate deals with too-large requests.
@@ -242,17 +239,17 @@ That's all you need to know. Good luck.
             },
             [template, post_id] if templates.has_template(template) => {
                 let post_id = data.lookup_url(post_id).unwrap_or_else(|| post_id.to_string());
-                render(&data, &templates, &template, &user, &post_id, 0)
+                render(&templates, &template, &user, &post_id, 0)
             },
             [template, post_id, page] if templates.has_template(template) => {
                 let post_id = data.lookup_url(post_id).unwrap_or_else(|| post_id.to_string());
                 let page = page.parse::<u64>();
-                render(&data, &templates, &template, &user, &post_id, page.unwrap_or(0))
+                render(&templates, &template, &user, &post_id, page.unwrap_or(0))
             },
             _ => match files.handle(req) {
                 Ok(x) => Ok(x),
                 Err(_) => {
-                    render(&data, &templates, "404", &user, "", 0)
+                    render(&templates, "404", &user, "", 0)
                 }
             },
         }

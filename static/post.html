@@ -9,8 +9,10 @@
   </head>
   <body>
     <main>
-      {{> post_login user=user url=url}}
-      {{> post_component depth=0 max_depth=max_depth post=(GetPostById post user) user=user page=page url=url}}
+      {{#with (GetPostById post user)}}
+        {{> post_login user=../user url=human_readable_url}}
+        {{> post_component depth=0 max_depth=../max_depth post=this user=../user page=../page url=human_readable_url}}
+      {{/with}}
     </main>
     <!-- Fix Chrome's transition-firing-on-load bug, probably: -->
     <script> </script>
