@@ -102,7 +102,7 @@ impl Database {
     /// 
     /// (Well, "atomic" is a word too strong for this: it was a nice thought, but firebase-rs has never heard of atomicity, and we don't care enough to implement transactions ourselves (https://stackoverflow.com/questions/23041800/firebase-transactions-via-rest-api).)
     /// (It first reads all, then writes all, each of these being atomic.)
-    /// (And, `posts_api` reads/updates `children_ids`, `rewarded_posts`, `created_post_ids` directly, with no regard for atomicity.)
+    /// (And, `posts_api` reads/updates `children`, `rewarded_posts`, `created_post_ids` directly, with no regard for atomicity.)
     pub fn update<F>(&self, ids: Vec<&str>, action: F)
     where F: FnOnce(Vec<Option<Post>>) -> Vec<Option<Post>> {
         let posts = self.read(ids);

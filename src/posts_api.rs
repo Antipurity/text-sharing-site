@@ -120,22 +120,14 @@ impl Post {
         if matches!(rights, CanPost::All) || matches!(rights, CanPost::Itself) && &parent.access_hash == access_hash {
             let id = new_uuid();
             let mut handles: Vec<JoinHandle<()>> = vec![];
-            fb.at(&fb_path(&["created_post_ids", access_hash])).ok().map(|node| {
+            fb.at(&fb_path(&["created_post_ids", &access_hash.replace(|c:char| !c.is_ascii_alphanumeric(), "_")])).ok().map(|node| {
                 handles.push(node.push_async(&format!("{{\"post_id\":\"{}\"}}", id), |_| ()))
             });
-            fb.at(&fb_path(&["children_ids", &parent.id])).ok().map(|node| {
-                // TODO: We need to push a real object, not a mere string. (We're being ignored now.)
-                //   Also, that object should include reward, which `post.reward` should update, so that we can index by that. ...So, basically, we need a hierarchy.
-                handles.push(node.push_async(&id, |_| ()))
+            fb.at(&fb_path(&["children", &parent.id])).ok().map(|node| {
+                let b = Some(format!("{{\"{}\":0}}", id));
+                b.map(|body| handles.push(node.update_async(body, |_| ())));
             });
-            // TODO: ...Also, we can't filter on strings. If we want filtering (as opposed to getting all children on every request), then we NEED to store posts hierarchically inside parents.
-            //   ...Or, store the reward in children_ids too, and store the child index in the post... But that's so desync-able and brittle and hard to implement...
-            // ...So.
-            // Do we want a DB for post_id→post_path?
-            //   ...Wait a second: DB rules aren't recursive, so we won't be able to index recursive-post children by reward anyway.
-            //   ...So we do actually need separate reward counters?...
-            //     Well, at least we won't need *arrays* of children, since we can key them by ID. So we can at least know the path.
-            atomic_update(fb, &fb_path(&["children_ids_length", &parent.id]), 0i64, |v| v+1);
+            atomic_update(fb, &fb_path(&["children_length", &parent.id]), 0i64, |v| v+1);
             for handle in handles { handle.join().unwrap(); }
             let parent_id = parent.id.clone();
             (
@@ -191,16 +183,22 @@ impl Post {
         let old = fb.at(&at).ok().map(|n| n.get().ok()).flatten().map(|r| from_str::<i8>(&r.body).ok()).flatten().unwrap_or(0i8);
         to_string::<i8>(&amount).ok().map(|string| fb.at(&at).ok().map(|n| n.update(&string).ok()));
         let delta = amount - old;
+        let reward = self.reward + (delta as i64);
+        fb.at(&fb_path(&["children", &self.parent_id])).ok().map(|node| {
+            // Update the reward in the child-list.
+            let b = Some(format!("{{\"{}\":{}}}", self.id, -reward));
+            b.map(|body| node.update(&body));
+        });
         if self.id != user_first_post.id {
             (user_first_post, Some(Post{
-                reward: self.reward + (delta as i64),
-                reverse_reward: self.reverse_reward - (delta as i64),
+                reward,
+                reverse_reward: -reward,
                 ..self
             }))
         } else {
             (Post{
-                reward: self.reward + (delta as i64),
-                reverse_reward: self.reverse_reward - (delta as i64),
+                reward,
+                reverse_reward: -reward,
                 ..user_first_post
             }, None)
         }
@@ -258,17 +256,24 @@ impl Post {
         let start = std::cmp::min(start, len);
         let end = std::cmp::min(end, len);
         if start <= end {
-            let node = fb.at(&fb_path(&["children_ids", &self.id])).ok();
+            let node = fb.at(&(fb_path(&["children", &self.id]))).ok();
             let response = node.map(|n| {
                 // `firebase_rs` is so broken, it can't even set more than one param in one query with any of its methods.
                 //   But life persists despite that.
                 let mut n = n.with_params();
                 let url = Arc::get_mut(&mut n.url).unwrap();
-                url.set_query(Some(&format!("startAt={}&limitToFirst={}&orderBy={}", start, end-start, "\"reverse_reward\"")));
+                url.set_query(Some(&format!("startAt={}&limitToFirst={}&orderBy={}", start, end-start, "\"$value\"")));
                 n.get().ok()
             }).flatten();
-            println!("  get_children_by_reward {:?}", response.as_ref()); // TODO: `orderBy must be defined when other query parameters are defined`... So, what do we order by? ...Wait, we *do* order by reverse reward, what the fuck.
-            let ids = response.map(|r| from_str::<Vec<String>>(&r.body).ok()).flatten();
+            let ids = response.map(|r| {
+                let map = from_str::<std::collections::HashMap<String, i64>>(&r.body).ok();
+                map.map(|m| {
+                    // Sort IDs manually, because Firebase doesn't want to.
+                    let mut ids: Vec<String> = m.keys().map(|k| k.clone()).collect();
+                    ids.sort_by_key(|id| m[id]);
+                    ids
+                })
+            }).flatten();
             match ids {
                 Some(ids) => Ok(ids),
                 None => Ok(vec![]),
@@ -278,7 +283,7 @@ impl Post {
         }
     }
     pub fn get_children_length(fb: &Firebase, post_id: &str) -> i64 {
-        let node = fb.at(&fb_path(&["children_ids_length", post_id])).ok();
+        let node = fb.at(&fb_path(&["children_length", post_id])).ok();
         let response = node.map(|n| n.get().ok()).flatten();
         let len = response.map(|r| from_str::<i64>(&r.body).ok()).flatten();
         len.unwrap_or(0i64)
