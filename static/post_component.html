@@ -20,7 +20,7 @@
             {{/each}}
           </div>
         {{/if}}
-        {{#each (GetPostChildren post user page post.children_length)}}
+        {{#each (GetPostChildren post.id user page post.children_length)}}
           {{> post_component depth=(Plus1 ../depth) max_depth=../max_depth post=this user=../user page=0 url=../url include_self_link=../include_self_link}}
         {{/each}}
       {{/if}}

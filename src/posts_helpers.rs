@@ -30,7 +30,7 @@ pub enum Which {
     GetParentId, // post → post_id
     GetSummary, // post → string (the first line of content)
     GetContent, // post → string (the whole Markdown content, parsed into HTML)
-    GetPostChildren, // post, user, page_index, length → array<post> (sorted by descending reward) (`length` should be `post.children_length`)
+    GetPostChildren, // post_id, user, page_index, length → array<post> (sorted by descending reward) (`length` should be `post.children_length`)
     GetUserFirstPostId, // user → post_id
     IsLoggedIn, // user → bool
     Plus1, // num → num (for recursion, to increment `depth`)
@@ -158,16 +158,14 @@ impl HelperDef for PostHelper {
                 },
                 _ => json!(""),
             },
-            Which::GetPostChildren => match arg(0).get("id").map(|v| v.as_str()) {
-                Some(Some(id)) => {
-                    let fb = &self.data.firebase;
-                    let first_post_id = auth(str_arg(1));
-                    let (start, end) = page(i64_arg(2));
-                    let len = i64_arg(3);
-                    let ch = Post::get_children_by_reward(id, fb, start, end, len as usize).unwrap();
-                    post_ids_to_post_json(ch, first_post_id().as_deref())
-                },
-                _ => json!(null),
+            Which::GetPostChildren => {
+                let id = str_arg(0);
+                let fb = &self.data.firebase;
+                let first_post_id = auth(str_arg(1));
+                let (start, end) = page(i64_arg(2));
+                let len = i64_arg(3);
+                let ch = Post::get_children_by_reward(id, fb, start, end, len as usize).unwrap();
+                post_ids_to_post_json(ch, first_post_id().as_deref())
             },
             Which::GetUserFirstPostId => {
                 json!(self.data.get_first_post(&str_arg(0))().unwrap_or_else(|| "".to_owned()))
