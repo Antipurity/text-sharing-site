@@ -256,7 +256,7 @@ That's all you need to know. Good luck.
     });
     let mut port = "1234".to_owned();
     for (key, value) in std::env::vars() {
-        if &key == "PORT" {
+        if &key == "$PORT" {
             port = value.clone();
         }
     }
