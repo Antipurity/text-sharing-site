@@ -254,5 +254,11 @@ That's all you need to know. Good luck.
             },
         }
     });
-    Iron::new(chain).http("localhost:1234").unwrap();
+    let mut port = "1234".to_owned();
+    for (key, value) in std::env::vars() {
+        if &key == "PORT" {
+            port = value.clone();
+        }
+    }
+    Iron::new(chain).http(format!("localhost:{}", port)).unwrap(); // TODO: How to read PORT from the environment?
 }
