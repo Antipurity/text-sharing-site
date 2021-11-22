@@ -254,10 +254,8 @@ That's all you need to know. Good luck.
             },
         }
     });
-    let port = match std::env::var("$PORT") {
-        Ok(v) => v,
-        Err(_) => "1234".to_owned(),
-    };
+    let mut args: Vec<String> = std::env::args().collect();
+    let port = if args.len() >= 2 { args.swap_remove(1) } else { "1234".to_owned() };
     println!("Listening on port {}...", port);
     Iron::new(chain).http(format!("localhost:{}", port)).unwrap();
 }
