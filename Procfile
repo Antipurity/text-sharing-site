@@ -1,1 +1,1 @@
-web: ./target/release/text_sharing_site
+web: ./target/release/text_sharing_site $PORT
