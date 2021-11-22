@@ -24,7 +24,19 @@ use serde_json::{from_str, to_string};
 /// 
 /// Of data.
 pub struct Database {
-    pub firebase: Firebase, // This doesn't need our synchronization.
+    firebase: Firebase, // This doesn't need our synchronization.
+}
+
+
+
+impl Database {
+    /// Accesses Firebase.
+    /// Pass in an array of strings (a path).
+    pub fn at(&self, path: &[&str]) -> Result<Firebase, firebase_rs::UrlParseError> {
+        let p = fb_path(path);
+        let secret = std::env::var("SHARED_SECRET").unwrap();
+        self.firebase.at(&(secret + "/" + &p))
+    }
 }
 
 
@@ -36,9 +48,9 @@ pub struct Database {
 /// ```
 /// assert_eq!(&fb_path(&["a", "", "c"]), "a/_/c");
 /// ```
-pub fn fb_path(a: &[&str]) -> String {
+fn fb_path(path: &[&str]) -> String {
     let mut first = true;
-    a.iter().fold(String::new(), |mut a, b| {
+    path.iter().fold(String::new(), |mut a, b| {
         a.reserve((if b.is_empty() {1} else {b.len()}) + (if first {0} else {1}));
         if !first { a.push_str("/") };
         first = false;
@@ -71,13 +83,12 @@ impl Database {
     /// Reads many posts from the database at once.
     pub fn read(&self, ids: Vec<&str>) -> Vec<Option<Post>> {
         // `firebase_rs`'s `.get_async` API is really dumb. It's forcing Arc and Mutex on us.
-        let fb = &self.firebase;
         let mut values: Vec<Arc<Mutex<Option<Post>>>> = vec![];
         let mut handles: Vec<Option<std::thread::JoinHandle<()>>> = vec![];
         for (i, id) in ids.iter().enumerate() {
             values.push(Arc::new(Mutex::new(None)));
             let item = values[i].clone();
-            let maybe_node = fb.at(&fb_path(&["posts", id])).ok();
+            let maybe_node = self.at(&["posts", id]).ok();
             handles.push(maybe_node.map(|node| node.get_async(move |res| {
                 let maybe_r = res.ok();
                 let maybe_r = maybe_r.map(|r| from_str(&r.body).ok()).flatten();
@@ -101,7 +112,6 @@ impl Database {
     where F: FnOnce(Vec<Option<Post>>) -> Vec<Option<Post>> {
         let posts = self.read(ids);
         let posts = action(posts);
-        let fb = &self.firebase;
         let mut handles: Vec<std::thread::JoinHandle<()>> = vec![];
         for maybe_post in posts {
             if let Some(mut post) = maybe_post {
@@ -109,7 +119,7 @@ impl Database {
                     post.human_readable_url = to_url_part(&post.content);
                 }
                 if post.access_hash != "" {
-                    fb.at(&fb_path(&["access_hash", &post.access_hash])).ok().map(|node| {
+                    self.at(&["access_hash", &post.access_hash]).ok().map(|node| {
                         // To not overwrite, this needs a `".validate": "!data.exists()"` rule on `"access_hash"/"$hash"`.
                         let b = to_string(&UserFirstPost{
                             first_post_id: post.id.clone(),
@@ -117,13 +127,13 @@ impl Database {
                         b.map(|body| handles.push(node.update_async(body, |_| ())));
                     });
                 }
-                fb.at(&fb_path(&["human_readable_url", &post.human_readable_url])).ok().map(|node| {
+                self.at(&["human_readable_url", &post.human_readable_url]).ok().map(|node| {
                     let b = to_string(&Shortened {
                         post_id: post.id.clone(),
                     }).ok();
                     b.map(|body| handles.push(node.update_async(body, |_| ())));
                 });
-                fb.at(&fb_path(&["posts", &post.id])).ok().map(|node| {
+                self.at(&["posts", &post.id]).ok().map(|node| {
                     let b = to_string(&post).ok();
                     b.map(|body| handles.push(node.set_async(body, |_| ())));
                 });
@@ -137,11 +147,9 @@ impl Database {
     /// Call the returned closure to get the result (the request is done async, so this is likely faster).
     pub fn get_first_post(&self, access_hash: &str) -> Box<dyn FnOnce()->Option<String>> {
         if access_hash == "" { return Box::new(|| None) }
-        let fb = &self.firebase;
         let value: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
         let value2 = value.clone();
-        let at = fb_path(&["access_hash", access_hash]);
-        let handle = fb.at(&at).ok().map(|n| n.get_async(move |r| {
+        let handle = self.at(&["access_hash", access_hash]).ok().map(|n| n.get_async(move |r| {
             let id = r.ok().map(|r| from_str::<UserFirstPost>(&r.body).ok().map(|u| u.first_post_id)).flatten().unwrap_or_else(|| "".to_owned());
             let mut l = value2.lock().unwrap();
             (*l).replace_range(.., &id);
@@ -161,8 +169,7 @@ impl Database {
     /// To get a post's URL, read `post.human_readable_url`: an empty string if not assigned.
     /// These URLs are auto-assigned, and will never collide with raw post IDs, nor with statically-served files (since these URLs are like `"2020_first_line_of_content"`).
     pub fn lookup_url(&self, url: &str) -> Option<String> {
-        let fb = &self.firebase;
-        fb.at(&fb_path(&["human_readable_url", url])).ok().map(|node| {
+        self.at(&["human_readable_url", url]).ok().map(|node| {
             node.get().ok().map(|r| from_str::<Shortened>(&r.body).ok().map(|s| s.post_id)).flatten()
         }).flatten()
     }

@@ -4,13 +4,11 @@ use std::sync::Arc;
 
 mod hashing;
 pub use hashing::access_token_hash;
-
-use crate::posts_store::fb_path;
+use crate::posts_store::Database;
 
 use uuid::Uuid;
 use serde_json::json;
 use handlebars::JsonValue;
-use firebase_rs::Firebase;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
 
@@ -43,10 +41,10 @@ fn timestamp() -> i64 {
 /// Atomic counters? In Firebase? Too modern for firebase_rs (and probably the REST API).
 /// Manually-implemented transactions? *Perfection*.
 /// Each counter has to have a rule in the DB which checks that the update is possible.
-fn atomic_update<F>(fb: &Firebase, at: &str, default: i64, mut update: F)
+fn atomic_update<F>(data: &Database, at: &[&str], default: i64, mut update: F)
 where F: FnMut(i64) -> i64 {
     // Until the write succeeds: read, then write updated value.
-    let maybe_node = fb.at(at).ok();
+    let maybe_node = data.at(at).ok();
     maybe_node.map(|node| {
         loop {
             let old = node.get().ok().map(|r| from_str::<i64>(&r.body).ok()).flatten().unwrap_or(default);
@@ -110,7 +108,7 @@ impl Post {
     /// Also pushes to a user's created posts (no way to atomize this with firebase_rs).
     /// `access_hash` must be `crate::posts_api::access_token_hash(user)`.
     /// Returns (parent, Option<child>).
-    pub fn new(fb: &Firebase, parent: Post, access_hash: &str, content: String, children_rights: CanPost) -> (Post, Option<Post>) {
+    pub fn new(data: &Database, parent: Post, access_hash: &str, content: String, children_rights: CanPost) -> (Post, Option<Post>) {
         if content.len() > 50000 {
             return (parent, None)
         }
@@ -118,14 +116,14 @@ impl Post {
         if matches!(rights, CanPost::All) || matches!(rights, CanPost::Itself) && &parent.access_hash == access_hash {
             let id = new_uuid();
             let mut handles: Vec<JoinHandle<()>> = vec![];
-            fb.at(&fb_path(&["created_post_ids", &access_hash.replace(|c:char| !c.is_ascii_alphanumeric(), "_")])).ok().map(|node| {
+            data.at(&["created_post_ids", &access_hash.replace(|c:char| !c.is_ascii_alphanumeric(), "_")]).ok().map(|node| {
                 handles.push(node.push_async(&format!("{{\"post_id\":\"{}\"}}", id), |_| ()))
             });
-            fb.at(&fb_path(&["children", &parent.id])).ok().map(|node| {
+            data.at(&["children", &parent.id]).ok().map(|node| {
                 let b = Some(format!("{{\"{}\":0}}", id));
                 b.map(|body| handles.push(node.update_async(body, |_| ())));
             });
-            atomic_update(fb, &fb_path(&["children_length", &parent.id]), 0i64, |v| v+1);
+            atomic_update(data, &["children_length", &parent.id], 0i64, |v| v+1);
             for handle in handles { handle.join().unwrap(); }
             let parent_id = parent.id.clone();
             (
@@ -162,7 +160,7 @@ impl Post {
     /// Only succeeds if the user has given up to ±10 of ±1 rewards, to force normalization.
     /// Returns (user_first_post, Option<rewarded_post>), and has some side-effects.
     /// Disgustingly non-atomic.
-    pub fn reward(self: Post, fb: &Firebase, mut user_first_post: Post, amount: i8) -> (Post, Option<Post>) {
+    pub fn reward(self: Post, data: &Database, mut user_first_post: Post, amount: i8) -> (Post, Option<Post>) {
         if amount != -100 && amount != -1 && amount != 0 && amount != 1 {
             return (user_first_post, None)
         };
@@ -176,13 +174,12 @@ impl Post {
             }
             user_first_post.gave_reward += amount;
         };
-        let at = fb_path(&["user_reward", &user_first_post.id, &self.id]);
-        let old = fb.at(&at).ok().map(|n| n.get().ok()).flatten().map(|r| from_str::<i8>(&r.body).ok()).flatten().unwrap_or(0i8);
-        to_string::<i8>(&amount).ok().map(|string| fb.at(&at).ok().map(|n| n.update(&string).ok()));
+        let at = ["user_reward", &user_first_post.id, &self.id];
+        let old = data.at(&at).ok().map(|n| n.get().ok()).flatten().map(|r| from_str::<i8>(&r.body).ok()).flatten().unwrap_or(0i8);
+        data.at(&at).ok().map(|n| to_string(&amount).ok().map(|s| n.set(&s).ok())).flatten().flatten();
         let delta = amount - old;
         let reward = self.reward + (delta as i64);
-        fb.at(&at).ok().map(|n| to_string(&amount).ok().map(|s| n.set(&s).ok())).flatten().flatten();
-        fb.at(&fb_path(&["children", &self.parent_id])).ok().map(|node| {
+        data.at(&["children", &self.parent_id]).ok().map(|node| {
             // Update the reward in the child-list.
             let b = Some(format!("{{\"{}\":{}}}", self.id, -reward));
             b.map(|body| node.update(&body));
@@ -205,7 +202,7 @@ impl Post {
     /// Despite the signature, the result contains no error, only different paths depending on whether parallelization is possible; consider using `to_json_sync` if no parallelization is OK.
     /// 
     /// `content` and `parent_id` and `human_readable_url` are strings, rewards are integers, `children_rights` is 'none'|'itself'|'all', `access_hash` is what the owner's access token must hash to, `logged_in` is a boolean.
-    pub fn to_json(self: &Post, fb: &Firebase, user_first_post_id: Option<&str>) -> Result<JsonValue, Box<dyn FnOnce()->JsonValue>> {
+    pub fn to_json(self: &Post, data: &Database, user_first_post_id: Option<&str>) -> Result<JsonValue, Box<dyn FnOnce()->JsonValue>> {
         let logged_in = user_first_post_id.is_some();
         let json_value = json!({
             "id": self.id,
@@ -226,14 +223,14 @@ impl Post {
         let value0: Arc<Mutex<JsonValue>> = Arc::new(Mutex::new(json_value));
         let handle1 = if logged_in {
             let value1 = value0.clone();
-            fb.at(&fb_path(&["user_reward", user_first_post_id.unwrap(), &self.id])).ok().map(|n| n.get_async(move |r| {
+            data.at(&["user_reward", user_first_post_id.unwrap(), &self.id]).ok().map(|n| n.get_async(move |r| {
                 let user_reward = r.ok().map(|r| from_str::<i8>(&r.body).ok()).flatten().unwrap_or(0i8);
                 let mut l = value1.lock().unwrap();
                 (*l).as_object_mut().unwrap().insert("user_reward".to_owned(), json!(user_reward));
             }))
         } else { None };
         let value2 = value0.clone();
-        let handle2 = fb.at(&fb_path(&["children_length", &self.id])).ok().map(|n| n.get_async(move |r| {
+        let handle2 = data.at(&["children_length", &self.id]).ok().map(|n| n.get_async(move |r| {
             let len = r.ok().map(|r| from_str::<i64>(&r.body).ok()).flatten().unwrap_or(0i64);
             let mut l = value2.lock().unwrap();
             (*l).as_object_mut().unwrap().insert("children_length".to_owned(), json!(len));
@@ -245,19 +242,19 @@ impl Post {
         }))
     }
     /// Like `.to_json` but foregoes parallelization.
-    pub fn to_json_sync(self: &Post, fb: &Firebase, user_first_post_id: Option<&str>) -> JsonValue {
-        match self.to_json(fb, user_first_post_id) {
+    pub fn to_json_sync(self: &Post, data: &Database, user_first_post_id: Option<&str>) -> JsonValue {
+        match self.to_json(data, user_first_post_id) {
             Ok(v) => v,
             Err(closure) => closure(),
         }
     }
 
     /// Gets the specified child-post IDs of a post, most-reward first.
-    pub fn get_children_by_reward(id: &str, fb: &Firebase, start:usize, end:usize, len:usize) -> Result<Vec<String>, ()> {
+    pub fn get_children_by_reward(id: &str, data: &Database, start:usize, end:usize, len:usize) -> Result<Vec<String>, ()> {
         let start = std::cmp::min(start, len);
         let end = std::cmp::min(end, len);
         if start <= end {
-            let node = fb.at(&(fb_path(&["children", id]))).ok();
+            let node = data.at(&["children", id]).ok();
             let response = node.map(|n| {
                 // `firebase_rs` is so broken, it can't even set more than one param in one query with any of its methods.
                 //   But life persists despite that.

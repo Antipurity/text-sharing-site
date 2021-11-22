@@ -46,7 +46,7 @@ fn main() {
         }
     }
 
-    let firebase = Firebase::new("https://text-sharing-site-default-rtdb.europe-west1.firebasedatabase.app/").unwrap(); // TODO: Auth this server, *in secret* (can't just commit this secret to Git).
+    let firebase = Firebase::new("https://text-sharing-site-default-rtdb.europe-west1.firebasedatabase.app/").unwrap();
     let data = Arc::new(posts_store::Database::new(firebase));
     data.update(vec![""], |v: Vec<Option<Post>>| {
         if v[0].is_none() {
@@ -178,7 +178,7 @@ That's all you need to know. Good luck.
                         if posts[0].is_none() { return vec![] };
                         let parent = posts.remove(0).unwrap();
                         let token = crate::posts_api::access_token_hash(&user);
-                        let r = Post::new(&data.firebase, parent, &token, content, rights);
+                        let r = Post::new(&data, parent, &token, content, rights);
                         let (parent, maybe_child) = r;
                         vec![Some(parent), maybe_child]
                     });
@@ -225,7 +225,7 @@ That's all you need to know. Good luck.
                             data.update(vec![&post_id, &first_post_id], |mut posts| {
                                 if posts.iter().any(|p| p.is_none()) { return vec![] };
                                 let (post, first_post) = (posts.remove(0).unwrap(), posts.remove(0).unwrap());
-                                let (first_post, maybe_post) = post.reward(&data.firebase, first_post, amount);
+                                let (first_post, maybe_post) = post.reward(&data, first_post, amount);
                                 vec![Some(first_post), maybe_post]
                             });
                             let url = url.unwrap_or_else(|| "/".to_string());

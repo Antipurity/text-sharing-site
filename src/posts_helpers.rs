@@ -68,7 +68,7 @@ impl HelperDef for PostHelper {
             // Collect user-data rewards in parallel.
             let mut posts = self.data.read(ids.iter().map(|s| &s[..]).collect());
             let mut perhaps_promises = posts.drain(..).map(|maybe_post| match maybe_post {
-                Some(post) => post.to_json(&self.data.firebase, first_post_id),
+                Some(post) => post.to_json(&self.data, first_post_id),
                 None => Ok(json!(null)),
             }).collect::<Vec<Result<JsonValue, Box<dyn FnOnce()->JsonValue>>>>();
             json!(perhaps_promises.drain(..).map(|p| match p {
@@ -83,7 +83,7 @@ impl HelperDef for PostHelper {
                     let post = |id: String| self.data.read(vec!(&id)).pop().unwrap();
                     let first_post_id = auth(str_arg(1));
                     match post(str_arg(0).to_string()) {
-                        Some(ref post) => post.to_json_sync(&self.data.firebase, first_post_id().as_deref()),
+                        Some(ref post) => post.to_json_sync(&self.data, first_post_id().as_deref()),
                         None => json!(null),
                     }
                 } else {
@@ -160,11 +160,10 @@ impl HelperDef for PostHelper {
             },
             Which::GetPostChildren => {
                 let id = str_arg(0);
-                let fb = &self.data.firebase;
                 let first_post_id = auth(str_arg(1));
                 let (start, end) = page(i64_arg(2));
                 let len = i64_arg(3);
-                let ch = Post::get_children_by_reward(id, fb, start, end, len as usize).unwrap();
+                let ch = Post::get_children_by_reward(id, &self.data, start, end, len as usize).unwrap();
                 post_ids_to_post_json(ch, first_post_id().as_deref())
             },
             Which::GetUserFirstPostId => {
