@@ -1,0 +1,1 @@
+web: ./target/release/text_sharing_site
